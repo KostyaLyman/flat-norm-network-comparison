@@ -92,16 +92,10 @@ d = {'nodes':G.nodes,
 df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
 
 
-fig = plt.figure(figsize=(10,10))
-ax = fig.add_subplot(111)
-df_edges.plot(ax=ax,edgecolor='red',linewidth=2.0,linestyle='dashed',alpha=1.0)
-df_nodes.plot(ax=ax,color='black',markersize=50,alpha=1.0)
-
-
 #%% Interpolate points along edge geometry
 pointlist = []
 pointgeom = []
-num_pts = 20
+num_pts = 500
 count = 100
 for e in G.edges:
     geom = G.edges[e]["geometry"]
@@ -117,7 +111,6 @@ for e in G.edges:
 
 d = {'points':pointlist,'geometry':pointgeom}
 df_points = gpd.GeoDataFrame(d, crs="EPSG:4326")
-df_points.plot(ax=ax,color='blue',markersize=30,alpha=1.0)
 
 
 #%% Compute distance metric
@@ -132,16 +125,46 @@ def distance(geomA,geomB,net):
     if edgeA == edgeB:
         return geomA.distance(geomB)
     else:
+        nodeA1,nodeA2 = edgeA
+        nodeB1,nodeB2 = edgeB
         
-        return
+        distA1 = geomA.distance(net.nodes[nodeA1]["geometry"])
+        distA2 = geomA.distance(net.nodes[nodeA2]["geometry"])
+        distB1 = geomB.distance(net.nodes[nodeB1]["geometry"])
+        distB2 = geomB.distance(net.nodes[nodeB2]["geometry"])
+        
+        dist11 = nx.shortest_path_length(net,nodeA1,nodeB1,weight='length')
+        dist12 = nx.shortest_path_length(net,nodeA1,nodeB2,weight='length')
+        dist21 = nx.shortest_path_length(net,nodeA2,nodeB1,weight='length')
+        dist22 = nx.shortest_path_length(net,nodeA2,nodeB2,weight='length')
+        
+        d11 = distA1+dist11+distB1
+        d12 = distA1+dist12+distB2
+        d21 = distA2+dist21+distB1
+        d22 = distA2+dist22+distB2
+        
+        return min(d11,d12,d21,d22)
+
+#%% Compute network distance
+s_geom = Point(2,0)
+y_pts = []
+x_pts = []
+for pt_geom in pointgeom:
+    x_pts.append(pt_geom.x)
+    y_pts.append(distance(pt_geom,s_geom,G))
 
 
+#%% Plot the persistence diagram
+fig = plt.figure(figsize=(20,10))
+ax1 = fig.add_subplot(121)
+df_edges.plot(ax=ax1,edgecolor='red',linewidth=2.0,linestyle='dashed',alpha=1.0)
+df_nodes.plot(ax=ax1,color='black',markersize=30,alpha=1.0)
+df_points.plot(ax=ax1,color='blue',markersize=1,alpha=1.0)
 
-
-
-
-
-
+ax2 = fig.add_subplot(122)
+ax2.scatter(x_pts,y_pts,marker='*',s=20,c='red')
+ax2.hlines(range(10), 0, 1, transform=ax2.get_yaxis_transform(), 
+           colors='blue',linestyle='dotted')
 
 
 
