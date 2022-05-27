@@ -78,6 +78,14 @@ def plot_1simplex(nodes_A,nodes_B,edges_AB,eps=None,name='tmp-0',close=True):
     # Draw the simplices
     ax = draw_edges(ax,edges_AB,all_nodes,color='green',width=2.0,style='solid')
     
+    # Draw the edges
+    edges_A = [(list(nodes_A.keys())[i],list(nodes_A.keys())[i+1]) \
+                for i in range(len(nodes_A)-1)]
+    edges_B = [(list(nodes_B.keys())[i],list(nodes_B.keys())[i+1]) \
+                for i in range(len(nodes_B)-1)]
+    ax = draw_edges(ax,edges_A,all_nodes,color='blue',width=2.0,style='solid')
+    ax = draw_edges(ax,edges_B,all_nodes,color='red',width=2.0,style='solid')
+    
     # Common axes
     ax.set_xlim(-0.5,2.5)
     ax.set_ylim(-0.8,1.2)
@@ -125,7 +133,7 @@ B = LineString([(0,0),(1,0.125),(2,0)])
 
 A_pts = interpolate(A,10,ref='A')
 B_pts = interpolate(B,10,ref='B')
-edgeset = product(A_pts.keys(),B_pts.keys())
+edgeset = list(product(A_pts.keys(),B_pts.keys()))
 
 
 e_list = np.linspace(0.1,0.4,31)
@@ -166,10 +174,4 @@ makegif(tmppath,figpath+'1-simplices')
 
 
 
-# Draw the edges
-# edges_A = [(list(nodes_A.keys())[i],list(nodes_A.keys())[i+1]) \
-#            for i in range(len(nodes_A)-1)]
-# edges_B = [(list(nodes_B.keys())[i],list(nodes_B.keys())[i+1]) \
-#            for i in range(len(nodes_B)-1)]
-# ax = draw_edges(ax,edges_A,all_nodes,color='blue',width=2.0,style='solid')
-# ax = draw_edges(ax,edges_B,all_nodes,color='red',width=2.0,style='solid')
+
