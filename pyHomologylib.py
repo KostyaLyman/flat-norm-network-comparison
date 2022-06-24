@@ -577,53 +577,46 @@ def get_min_max(intervals):
 			p_max = max(p_max,y)
 	return p_min,p_max
 
-def persistence_diagram(intervals,saveAs = None):
-	"""
+def persistence_diagram(ax,intervals):
+    """
 	Plots the persistence diagram of the input list.
 	Arguments:
 	- intervals: list of tuples (x,y) of reals. y may be inf
-	- saveAs: optional. String specifying a path / name to
-	save the image of the diagram. If set, the function will not
-	show the diagram but only save it.
 	"""
-	if len(intervals) == 0:
-		fig, ax = plt.subplots()
-		lower_limit = 0
-		upper_limit = 1
-		ax.set_xlim(left = lower_limit,right = upper_limit)
-		ax.set_ylim(bottom = lower_limit,top = upper_limit)
-		ax.plot([lower_limit, upper_limit],[lower_limit , upper_limit],'b-')
-		if saveAs:
-			plt.savefig(saveAs)
-			print("Saved figure at " + saveAs)
-		else:
-			plt.show()
-		return
-
-	p_min, p_max = get_min_max(intervals)
-	dp = p_max - p_min
-
-	lower_limit = 0 - dp/5
-	upper_limit = p_max + dp/5
-
-
-	fig, ax = plt.subplots()
-	ax.set_xlim(left = lower_limit,right = upper_limit)
-	ax.set_ylim(bottom = lower_limit,top = upper_limit)
-	ax.plot([lower_limit, upper_limit],[lower_limit , upper_limit],'b-')
-
-	for (x,y) in set(intervals):
-		if y == inf:
-			ax.plot([x,x],[x,upper_limit],'g-')
-		else:
-			ax.plot([x],[y],'ro')
-
-	if saveAs:
-		plt.savefig(saveAs)
-		plt.close()
-		print("Saved figure at " + saveAs)
-	else:
-		plt.show()
+    if len(intervals) == 0:
+        lower_limit = 0
+        upper_limit = 1
+        ax.set_xlim(left = lower_limit,right = upper_limit)
+        ax.set_ylim(bottom = lower_limit,top = upper_limit)
+        ax.plot([lower_limit, upper_limit],[lower_limit , upper_limit],
+                color='orange',linestyle='dashed')
+        
+        ax.set_xlabel("Birth",fontsize=25)
+        ax.set_ylabel("Death",fontsize=25)
+        ax.tick_params(labelsize=25)
+	    
+    else:
+        p_min, p_max = get_min_max(intervals)
+        dp = p_max - p_min
+        
+        lower_limit = 0 - dp/5
+        upper_limit = p_max + dp/5
+        
+        ax.set_xlim(left = lower_limit,right = upper_limit)
+        ax.set_ylim(bottom = lower_limit,top = upper_limit)
+        ax.plot([lower_limit, upper_limit],[lower_limit , upper_limit],
+                color='orange',linestyle='dashed')
+    
+        for (x,y) in set(intervals):
+            if y == inf:
+                ax.plot([x,x],[x,upper_limit],c='green',linestyle='dashed')
+            else:
+                ax.plot([x],[y],c='magenta',marker='o')
+        
+        ax.set_xlabel("Birth",fontsize=25)
+        ax.set_ylabel("Death",fontsize=25)
+        ax.tick_params(labelsize=25)
+    return ax
 
 
 
@@ -681,17 +674,17 @@ def barcode(intervals):
 #%% Plot functions for geometry
 import geopandas as gpd
 
-def draw_nodes(ax,graph,nodelist=None,color='red',size=30,alpha=1.0,marker='*'):
+def draw_nodes(ax,graph,nodelist=None,color='red',size=30,alpha=1.0,marker='*',label=None):
     if nodelist == None:
         nodelist = graph.nodes
     d = {'nodes':nodelist,
          'geometry':[Point(graph.nodes[n]['cord']) for n in nodelist]}
     df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_nodes.plot(ax=ax,color=color,markersize=size,alpha=alpha,marker=marker)
+    df_nodes.plot(ax=ax,color=color,markersize=size,alpha=alpha,marker=marker,label=label)
     return ax
 
 def draw_edges(ax,graph,edgelist=None,color='red',width=2.0,style='solid',
-               alpha=1.0):
+               alpha=1.0,label=None):
     if edgelist == []:
         return ax
     if edgelist == None:
@@ -700,10 +693,10 @@ def draw_edges(ax,graph,edgelist=None,color='red',width=2.0,style='solid',
          'geometry':[graph.edges[e]['geometry'] for e in edgelist]}
     df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
     df_edges.plot(ax=ax,edgecolor=color,linewidth=width,
-                  linestyle=style,alpha=alpha)
+                  linestyle=style,alpha=alpha,label=label)
     return ax
 
-def draw_points(ax,points,color='red',size=10,alpha=1.0,marker='o'):
+def draw_points(ax,points,color='red',size=10,alpha=1.0,marker='o',label=None):
     if len(points) == 0:
         return ax
     if isinstance(points,list):
@@ -713,10 +706,10 @@ def draw_points(ax,points,color='red',size=10,alpha=1.0,marker='o'):
         d = {'nodes':range(len(points)),
              'geometry':[points[k] for k in points]}
     df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_nodes.plot(ax=ax,color=color,markersize=size,alpha=alpha,marker=marker)
+    df_nodes.plot(ax=ax,color=color,markersize=size,alpha=alpha,marker=marker,label=label)
     return ax
 
-def draw_lines(ax,lines,color='red',width=2.0,style='solid',alpha=1.0):
+def draw_lines(ax,lines,color='red',width=2.0,style='solid',alpha=1.0,label=None):
     if isinstance(lines,LineString):
         lines = [lines]
     if len(lines) == 0:
@@ -725,7 +718,7 @@ def draw_lines(ax,lines,color='red',width=2.0,style='solid',alpha=1.0):
          'geometry':[line_geom for line_geom in lines]}
     df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
     df_edges.plot(ax=ax,edgecolor=color,linewidth=width,
-                  linestyle=style,alpha=alpha)
+                  linestyle=style,alpha=alpha,label=label)
     return ax
 
 #%% Graph example
@@ -775,28 +768,30 @@ for pt in pts_B:
     pts[pt] = pts_B[pt]
     
 
-fig = plt.figure(figsize=(20,10))
+fig = plt.figure(figsize=(30,30))
 ax1 = fig.add_subplot(1,2,1)
 
-draw_edges(ax1,A,color='red',width=2.0,style='solid')
-draw_edges(ax1,B,color='blue',width=2.0,style='solid')
-draw_nodes(ax1,A,color='red',size=30,marker='s',alpha=0.6)
-draw_nodes(ax1,B,color='blue',size=30,marker='o')
+draw_edges(ax1,A,color='red',width=2.0,style='solid',label="Graph A edges")
+draw_edges(ax1,B,color='blue',width=2.0,style='solid',label="Graph B edges")
+draw_nodes(ax1,A,color='red',size=30,marker='s',alpha=0.6,label="Graph A nodes")
+draw_nodes(ax1,B,color='blue',size=30,marker='o',label="Graph B nodes")
+ax1.legend(markerscale=2,fontsize=20)
 
 ax2 = fig.add_subplot(1,2,2)
-draw_points(ax2,pts_A,color='red',size=15,alpha=0.6,marker='D')
-draw_points(ax2,pts_B,color='blue',size=15,alpha=0.6,marker='o')
+draw_points(ax2,pts_A,color='red',size=15,alpha=0.6,marker='D',label="Point Cloud A")
+draw_points(ax2,pts_B,color='blue',size=15,alpha=0.6,marker='o',label="Point Cloud B")
+ax2.legend(markerscale=3,fontsize=25)
 
 
 #%% Main Code with Rips complex
 lA = [list(pts_A[pt].coords)[0] for pt in pts_A]
 lB = [list(pts_B[pt].coords)[0] for pt in pts_B]
 
-rA = RipsComplex(lA,threshold = 0.23,verbose = True)
-rB = RipsComplex(lB,threshold = 0.23,verbose = True)
+rA = RipsComplex(lA,threshold = 1.5,verbose = True)
+rB = RipsComplex(lB,threshold = 1.5,verbose = True)
 
-rA.compute_skeleton(3)
-rB.compute_skeleton(3)
+rA.compute_skeleton(2)
+rB.compute_skeleton(2)
 
 zcA = ZomorodianCarlsson(rA.complex, strict = True,verbose = True)
 zcB = ZomorodianCarlsson(rB.complex, strict = True,verbose = True)
@@ -804,18 +799,40 @@ zcB = ZomorodianCarlsson(rB.complex, strict = True,verbose = True)
 zcA.computeIntervals()
 zcB.computeIntervals()
 
-persistence_diagram(zcA.intervals[0])
-persistence_diagram(zcA.intervals[1])
-persistence_diagram(zcA.intervals[2])
 
-persistence_diagram(zcB.intervals[0])
-persistence_diagram(zcB.intervals[1])
-persistence_diagram(zcB.intervals[2])
+#%% Save homology figure
+import os
+workpath = os.getcwd()
+figpath = workpath + "/figs/"
+
+for i in range(len(zcA.intervals)):
+    if (len(zcA.intervals[i]) != 0) and (len(zcB.intervals[i]) != 0):
+        fig = plt.figure(figsize=(20,10))
+        ax1 = fig.add_subplot(1,2,1)
+        ax2 = fig.add_subplot(1,2,2)
+        ax1 = persistence_diagram(ax1,zcA.intervals[i])
+        ax2 = persistence_diagram(ax2,zcB.intervals[i])
+        ax1.set_title("Persistence diagram of H"+str(i)+" for Graph A", fontsize=25)
+        ax2.set_title("Persistence diagram of H"+str(i)+" for Graph B", fontsize=25)
+        fig.savefig(figpath+"example-h"+str(i)+'.png',bbox_inches='tight')
 
 
 
+#%% Rips complex for total 
+l = lA+lB
+r = RipsComplex(l,threshold=1.5,verbose=True)
+r.compute_skeleton(3)
+zc = ZomorodianCarlsson(rA.complex, strict = True,verbose = True)
+zc.computeIntervals()
 
-
+for i in range(len(zc.intervals)):
+    if (len(zc.intervals[i]) != 0):
+        fig = plt.figure(figsize=(10,10))
+        ax = fig.add_subplot(1,1,1)
+        ax = persistence_diagram(ax,zc.intervals[i])
+        ax.set_title("Persistence diagram of H"+str(i)+" for overlayed graphs", 
+                      fontsize=25)
+        fig.savefig(figpath+"all-example-h"+str(i)+'.png',bbox_inches='tight')
 
 
 
