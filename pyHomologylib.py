@@ -759,8 +759,8 @@ nx.set_node_attributes(B,cords_B,'cord')
 geom_B = [B.edges[e]['geometry'] for e in B.edges]
 
 
-pts_A = interpolate_points(geom_A,num_pts=20,ref='A')
-pts_B = interpolate_points(geom_B,num_pts=20,ref='B')
+pts_A = interpolate_points(geom_A,num_pts=5,ref='A')
+pts_B = interpolate_points(geom_B,num_pts=5,ref='B')
 pts = {}
 for pt in pts_A:
     pts[pt] = pts_A[pt]
@@ -822,7 +822,7 @@ for i in range(len(zcA.intervals)):
 l = lA+lB
 r = RipsComplex(l,threshold=1.5,verbose=True)
 r.compute_skeleton(3)
-zc = ZomorodianCarlsson(rA.complex, strict = True,verbose = True)
+zc = ZomorodianCarlsson(r.complex, strict = True,verbose = True)
 zc.computeIntervals()
 
 for i in range(len(zc.intervals)):
@@ -838,13 +838,79 @@ for i in range(len(zc.intervals)):
 
 
 
+#%%
+fig = plt.figure(figsize=(10,10))
+ax2 = fig.add_subplot(1,1,1)
+draw_points(ax2,pts_A,color='red',size=15,alpha=0.6,marker='o')
+draw_points(ax2,pts_B,color='red',size=15,alpha=0.6,marker='o')
 
 
 
+#%% Example 2
+# Graph A
+edges_A = [(1,2),(2,3)]
+cords_A = {1:(-1,0.5), 2:(0,1), 3:(1,0.5)}
+edge_geom_A = {e:LineString([cords_A[e[0]],cords_A[e[1]]]) for e in edges_A}
+
+A = nx.Graph()
+A.add_edges_from(edges_A)
+nx.set_edge_attributes(A,edge_geom_A,'geometry')
+nx.set_node_attributes(A,cords_A,'cord')
+geom_A = [A.edges[e]['geometry'] for e in A.edges]
+
+# Graph B
+edges_B = [(11,12),(12,13),(13,14),(14,15)]
+cords_B = {11:(-1,0.5), 12:(-0.5,0.75), 13:(0,1), 14:(0.5,0.75), 15:(1,0.5)}
+edge_geom_B = {e:LineString([cords_B[e[0]],cords_B[e[1]]]) for e in edges_B}
+
+B = nx.Graph()
+B.add_edges_from(edges_B)
+nx.set_edge_attributes(B,edge_geom_B,'geometry')
+nx.set_node_attributes(B,cords_B,'cord')
+geom_B = [B.edges[e]['geometry'] for e in B.edges]
 
 
+pts_A = interpolate_points(geom_A,num_pts=5,ref='A')
+pts_B = interpolate_points(geom_B,num_pts=5,ref='B')
+pts = {}
+for pt in pts_A:
+    pts[pt] = pts_A[pt]
+for pt in pts_B:
+    pts[pt] = pts_B[pt]
+    
+
+fig = plt.figure(figsize=(30,30))
+ax1 = fig.add_subplot(1,2,1)
+
+draw_edges(ax1,A,color='red',width=2.0,style='solid',label="Graph A edges")
+draw_edges(ax1,B,color='blue',width=2.0,style='solid',label="Graph B edges")
+draw_nodes(ax1,A,color='red',size=30,marker='s',alpha=0.6,label="Graph A nodes")
+draw_nodes(ax1,B,color='blue',size=30,marker='o',label="Graph B nodes")
+ax1.legend(markerscale=2,fontsize=20)
+
+ax2 = fig.add_subplot(1,2,2)
+draw_points(ax2,pts_A,color='red',size=15,alpha=0.6,marker='D',label="Point Cloud A")
+draw_points(ax2,pts_B,color='blue',size=15,alpha=0.6,marker='o',label="Point Cloud B")
+ax2.legend(markerscale=3,fontsize=25)
 
 
+lA = [list(pts_A[pt].coords)[0] for pt in pts_A]
+lB = [list(pts_B[pt].coords)[0] for pt in pts_B]
+
+l = lA+lB
+r = RipsComplex(l,threshold=1.5,verbose=True)
+r.compute_skeleton(3)
+zc = ZomorodianCarlsson(r.complex, strict = True,verbose = True)
+zc.computeIntervals()
+
+for i in range(len(zc.intervals)):
+    if (len(zc.intervals[i]) != 0):
+        fig = plt.figure(figsize=(10,10))
+        ax = fig.add_subplot(1,1,1)
+        ax = persistence_diagram(ax,zc.intervals[i])
+        ax.set_title("Persistence diagram of H"+str(i)+" for overlayed graphs", 
+                      fontsize=25)
+        fig.savefig(figpath+"all-same-h"+str(i)+'.png',bbox_inches='tight')
 
 
 
