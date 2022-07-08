@@ -205,3 +205,25 @@ def get_areadata(path,area,root,synth):
             'df_buses':df_buses,'actual':act_graph,
             'synthetic':synth_graph,'df_synth':df_synth,'df_cords':df_cords}
     return data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

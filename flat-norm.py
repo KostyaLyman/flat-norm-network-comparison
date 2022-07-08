@@ -20,20 +20,9 @@ from pyLPsolverlib import lp_solver
 
 #%% Plot functions
 import geopandas as gpd
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, MultiPoint
 import matplotlib.pyplot as plt
 
-
-def interpolate_points(lines,num_pts=100,ref='A',start_ind=None):
-    points = {}
-    for i,line_geom in enumerate(lines):
-        dist = 1/num_pts
-        start_ind = (i*num_pts)
-        for f in range(num_pts+1):
-            x,y = line_geom.interpolate(f*dist,normalized=True).xy
-            xy = (x[0],y[0])
-            points[ref+str(start_ind+f)] = Point(xy)
-    return points
 
 def draw_points(ax,points,color='red',size=10,alpha=1.0,marker='o',label=None):
     if len(points) == 0:
@@ -127,11 +116,27 @@ def get_flat_approx(x,points,simplices):
     return flat_lines
 
 #%%
-pts = [Point(0,0),Point(1,0),Point(1,1),Point(2,0),Point(2,1),Point(1,2)]
-order = [3,1,0,2,4]
-order_ = [5,2,1,4]
-lines = [LineString((pts[order[i]],pts[order[i+1]])) for i in range(len(order)-1)]
-lines += [LineString((pts[order_[i]],pts[order_[i+1]])) for i in range(len(order_)-1)]
+
+lines = [LineString((Point(2,0),Point(1,0))),
+         LineString((Point(1,0),Point(0,0))),
+         LineString((Point(0,0),Point(1,1))),
+         LineString((Point(1,1),Point(2,1))),
+         LineString((Point(1,2),Point(1,1))),
+         LineString((Point(1,1),Point(1,0))),
+         LineString((Point(1,0),Point(2,1)))]
+
+
+pts_check = [Point(0,0),Point(1,0),Point(1,1),Point(2,0),Point(2,1),Point(1,2)]
+
+pts = []
+for line_geom in lines:
+    pt_geom = line_geom.interpolate(0.5)
+    pts.append.extend()
+
+
+
+sys.exit(0)
+
 chain = [[0,1],[0,2],[1,2],[3,1],[1,4],[4,2],[3,4],[5,2],[5,4]]
 geom_subsimplices = [LineString((pts[c[0]],pts[c[1]])) for c in chain]
 
@@ -192,7 +197,8 @@ draw_lines(ax2,flat_lines2,color='green',width=2.0,style='solid',alpha=1.0,direc
 ax2.set_title("Scale="+str(lambda_2),fontsize=15)
 
 
-
+#%% Get set of points for drawing the flat norm manifold
+hull = MultiPoint(pts).convex_hull.boundary
 
 
 
