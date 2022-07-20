@@ -130,18 +130,27 @@ def get_flat_approx(x,points,simplices):
     return flat_lines
 
 #%% Functions to create data structure for triangulation
+def get_geometry(input_geometry):
+    out_geometry = []
+    for geom in input_geometry:
+        geom_vertices = [Point(c) for c in geom.coords]
+        for i in range(len(geom_vertices)-1):
+            out_geometry.append(LineString((geom_vertices[i],
+                                            geom_vertices[i+1])))
+    return out_geometry
+
 def get_combined_structure(geometry):
     vertices = []
-    segments = []
     for geom in geometry:
         geom_vertices = [Point(c) for c in geom.coords]
         for c in geom_vertices:
             if c not in vertices:
                 vertices.append(c)
-        for i in range(len(geom_vertices)-1):
-            ind1 = vertices.index(geom_vertices[i])
-            ind2 = vertices.index(geom_vertices[i+1])
-            segments.append((ind1,ind2))
+    segments = []
+    for geom in geometry:
+        ind1 = vertices.index(Point(geom.coords[0]))
+        ind2 = vertices.index(Point(geom.coords[1]))
+        segments.append((ind1,ind2))
     struct = {'vertices':np.array([v.coords[0] for v in vertices]), 
               'segments':np.array(segments)}
     return struct
@@ -171,29 +180,45 @@ def update_segment(segments,intersections):
         seg.extend(get_segments(pt_list))
     return seg
 
-def get_current(triangle_structure,geometry):
+def get_current(triangle_structure,input_geometry):
     current = []
-    for edge in triangle_structure['edges'].tolist():
-        vert1 = Point(triangle_structure['vertices'][edge[0]])
-        vert2 = Point(triangle_structure['vertices'][edge[1]])
+    
+    vertices = triangle_structure['vertices'].tolist()
+    edges = triangle_structure['edges'].tolist()
+    
+    for edge in edges:
+        vert1 = Point(vertices[edge[0]])
+        vert2 = Point(vertices[edge[1]])
         forward_geom = LineString((vert1,vert2))
         reverse_geom = LineString((vert2,vert1))
-        if forward_geom in geometry:
+        if forward_geom in input_geometry:
             current.append(1)
-        elif reverse_geom in geometry:
+        elif reverse_geom in input_geometry:
             current.append(-1)
         else:
             current.append(0)
     return np.array(current)
 
 
+def get_vertseg_geometry(geometry):
+    struct = get_combined_structure(geometry)
+    geom_vertices = [Point(v) for v in struct['vertices'].tolist()]
+    geom_segments = [LineString((struct['vertices'][c[0]],
+                                 struct['vertices'][c[1]])) \
+                      for c in struct['segments']]
+    return geom_vertices, geom_segments
+
 
 #%% Toy Example
 
 # Input geometries
 geom1 = [LineString((Point(0,0),Point(1,1))),
-         LineString((Point(1,1),Point(2,0)))]
-geom2 = [LineString((Point(0,0.5),Point(2,0.5)))]
+         LineString((Point(1,1),Point(2,0))),
+         LineString((Point(2,0),Point(3,1),Point(4,0)))]
+geom2 = [LineString((Point(0,0.5),Point(2,0.5),Point(4,0.5)))]
+
+geom1 = get_geometry(geom1)
+geom2 = get_geometry(geom2)
 
 # Get intersection of geometries
 pt_intersect = get_intersections(geom1, geom2)
@@ -229,9 +254,9 @@ for tgl in tri_struct['triangles']:
         edges.append([tgl[2],tgl[0]])
 tri_struct['edges'] = np.array(edges)
 
-T1 = get_current(tri_struct, new_geom1)
-T2 = get_current(tri_struct, new_geom2)
 
+T1 = get_current(tri_struct,new_geom1)
+T2 = get_current(tri_struct,new_geom2)
 T = T1 - T2
 
 lambda_1 = 0.001
@@ -249,27 +274,13 @@ geom_edges = [LineString(vertices[e]) for e in edges]
 
 
 #%% Plot the example
-struct1 = get_combined_structure(geom1)
-struct2 = get_combined_structure(geom2)
-geom1_vertices = [Point(v) for v in struct1['vertices'].tolist()]
-geom2_vertices = [Point(v) for v in struct2['vertices'].tolist()]
-geom1_segments = [LineString((struct1['vertices'][c[0]],
-                              struct1['vertices'][c[1]])) \
-                  for c in struct1['segments']]
-geom2_segments = [LineString((struct2['vertices'][c[0]],
-                              struct2['vertices'][c[1]])) \
-                  for c in struct2['segments']]
+geom1_vertices,geom1_segments = get_vertseg_geometry(geom1)
+geom2_vertices,geom2_segments = get_vertseg_geometry(geom2)
+new_geom1_vertices,new_geom1_segments = get_vertseg_geometry(new_geom1)
+new_geom2_vertices,new_geom2_segments = get_vertseg_geometry(new_geom2)
 
-new_struct1 = get_combined_structure(new_geom1)
-new_struct2 = get_combined_structure(new_geom2)
-new_geom1_vertices = [Point(v) for v in new_struct1['vertices'].tolist()]
-new_geom2_vertices = [Point(v) for v in new_struct2['vertices'].tolist()]
-new_geom1_segments = [LineString((new_struct1['vertices'][c[0]],
-                                  new_struct1['vertices'][c[1]])) \
-                      for c in new_struct1['segments']]
-new_geom2_segments = [LineString((new_struct2['vertices'][c[0]],
-                                  new_struct2['vertices'][c[1]])) \
-                      for c in new_struct2['segments']]
+
+
 
 geom_all_vertices = [Point(v) for v in struct['vertices'].tolist()]
 geom_all_segments = [LineString((struct['vertices'][c[0]],
@@ -291,16 +302,16 @@ draw_lines(ax1,geom1_segments,color='red',width=1.0,style='solid',alpha=1.0,
 draw_points(ax1,geom2_vertices,color='blue',size=20,alpha=1.0,marker='o')
 draw_lines(ax1,geom2_segments,color='blue',width=1.0,style='solid',alpha=1.0,
            directed=False,label='Estimated Geometry')
-ax1.legend(fontsize=20, markerscale=3)
+ax1.legend(fontsize=15, markerscale=2)
 
 ax2 = fig.add_subplot(222)
 draw_points(ax2,new_geom1_vertices,color='red',size=20,alpha=1.0,marker='o')
 draw_lines(ax2,new_geom1_segments,color='red',width=1.0,style='solid',alpha=1.0,
-           directed=False,label='Ground Truth Geometry')
+            directed=False,label='Ground Truth Geometry')
 draw_points(ax2,new_geom2_vertices,color='blue',size=20,alpha=1.0,marker='o')
 draw_lines(ax2,new_geom2_segments,color='blue',width=1.0,style='solid',alpha=1.0,
-           directed=False,label='Estimated Geometry')
-ax2.legend(fontsize=20, markerscale=3)
+            directed=False,label='Estimated Geometry')
+ax2.legend(fontsize=15, markerscale=2)
 
 
 ax3 = fig.add_subplot(223)

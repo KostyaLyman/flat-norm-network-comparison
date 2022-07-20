@@ -28,6 +28,7 @@ synpath = workpath + "/input/primnet/"
 from pyUtilslib import simpvol_geod, boundary_matrix
 from pyLPsolverlib import lp_solver
 from pyExtractDatalib import GetDistNet
+from pyGeometrylib import geodist
 
 
 #%% Plot functions
@@ -76,18 +77,46 @@ def draw_lines(ax,lines,color='red',width=2.0,style='solid',alpha=1.0,label=None
 
 
 #%% Functions to create data structure for triangulation
-def get_combined_structure(geometry):
+def get_geometry(input_geometry):
+    out_geometry = []
+    for geom in input_geometry:
+        geom_vertices = [Point(c) for c in geom.coords]
+        for i in range(len(geom_vertices)-1):
+            pt1 = geom_vertices[i]
+            pt2 = geom_vertices[i+1]
+            if geodist(pt1,pt2) > 1e-6:
+                out_geometry.append(LineString((pt1,pt2)))
+    return out_geometry
+
+def filter_out(geometry):
+    out_geometry = []
+    for i,i_geom in enumerate(geometry):
+        if len(out_geometry) == 0:
+            out_geometry.append(i_geom)
+        else:
+            flag = 0
+            for j,j_geom in enumerate(out_geometry):
+                int_geom = i_geom.intersection(j_geom)
+                if i_geom.intersects(j_geom) and isinstance(int_geom, LineString):
+                    print(i,j)
+                    flag = 1
+                    break
+            if flag == 0:
+                out_geometry.append(i_geom)
+    return out_geometry
+
+def get_structure(geometry):
     vertices = []
-    segments = []
     for geom in geometry:
         geom_vertices = [Point(c) for c in geom.coords]
         for c in geom_vertices:
             if c not in vertices:
                 vertices.append(c)
-        for i in range(len(geom_vertices)-1):
-            ind1 = vertices.index(geom_vertices[i])
-            ind2 = vertices.index(geom_vertices[i+1])
-            segments.append((ind1,ind2))
+    segments = []
+    for geom in geometry:
+        ind1 = vertices.index(Point(geom.coords[0]))
+        ind2 = vertices.index(Point(geom.coords[1]))
+        segments.append((ind1,ind2))
     struct = {'vertices':np.array([v.coords[0] for v in vertices]), 
               'segments':np.array(segments)}
     return struct
@@ -131,6 +160,15 @@ def get_current(triangle_structure,geometry):
         else:
             current.append(0)
     return np.array(current)
+
+def get_vertseg_geometry(struct):
+    if isinstance(struct,list):
+        struct = get_structure(struct)
+    geom_vertices = [Point(v) for v in struct['vertices'].tolist()]
+    geom_segments = [LineString((struct['vertices'][c[0]],
+                                 struct['vertices'][c[1]])) \
+                      for c in struct['segments']]
+    return geom_vertices, geom_segments
 
 
 
@@ -213,6 +251,8 @@ for e in sorted_edges:
     sorted_act_geom.append(geom)
 
 
+print("Task completed: Actual network geometry sorted")
+
 #%% Extract synthetic network data
 sublist = [150722, 150723, 150724, 150725, 150726, 150727, 150728]
 synth = GetDistNet(synpath,sublist)
@@ -224,7 +264,7 @@ nodelist = [n for n in synth.nodes \
 
 sorted_syn_geom = []
 syn_graph = nx.subgraph(synth,nodelist)
-for comp in nx.connected_components(syn_graph):
+for comp in list(nx.connected_components(syn_graph))[:1]:
     x_cord = [synth.nodes[n]['cord'][0] for n in comp]
     l_node = list(comp)[np.argmin(x_cord)]
     sorted_syn_edges = list(nx.dfs_edges(syn_graph, source=l_node))
@@ -232,36 +272,67 @@ for comp in nx.connected_components(syn_graph):
         sorted_syn_geom.append(synth.edges[e]['geometry'])
 
 
-#%% Prepare for triangulation
-act_struct = get_combined_structure(sorted_act_geom)
-syn_struct = get_combined_structure(sorted_syn_geom)
+print("Task completed: Synthetic network geometry sorted")
 
-# Get intersection of geometries
-act_geom = [LineString((act_struct['vertices'][s[0]],
-                        act_struct['vertices'][s[1]])) \
-            for s in act_struct['segments']]
-syn_geom = [LineString((syn_struct['vertices'][s[0]],
-                        syn_struct['vertices'][s[1]])) \
-            for s in syn_struct['segments']]
+#%% Prepare for triangulation
+act_geom = get_geometry(sorted_act_geom)
+syn_geom = get_geometry(sorted_syn_geom)
+
 pt_intersect = get_intersections(act_geom, syn_geom)
+print("Task completed: Intersection of network geometries")
 
 # Update geometries with new points and segments
 new_geom1 = update_segment(act_geom,pt_intersect)
 new_geom2 = update_segment(syn_geom,pt_intersect)
-
-# Combine geometries for triangulation
-struct = get_combined_structure(new_geom1 + new_geom2)
+remlist = [76, 468, 851, 1198, 1557, 1577, 1630]
+new_geom2 = [g for i,g in enumerate(new_geom2) if i not in remlist]
+print("Task completed: Updated geometries with intersecting points")
 
 # Add vertices and segments to surround the area
-vert_cords = struct['vertices']
-min_cord = np.min(vert_cords,axis=0) - buffer
-max_cord = np.max(vert_cords,axis=0) + buffer
-extra_vert = [min_cord,[min_cord[0],max_cord[1]],
-              max_cord,[max_cord[0],min_cord[1]],min_cord]
+buffer = 1e-3
+left = min(x_bus)-buffer
+right = max(x_bus)+buffer
+bottom = min(y_bus)-buffer
+top = max(y_bus)+buffer
+extra_vert = [[left,bottom],[left,top],[right,top],[right,bottom],[left,bottom]]
 extra_geom = [LineString((extra_vert[i],extra_vert[i+1])) for i in range(4)]
 
+syn_struct = get_structure(extra_geom + new_geom2 + new_geom1)
+
+
+#%% Check for bug in triangulation
+
+# remlist = [80,472,855,1202,1561,1581,1634]
+remlist = []
+
+check_struct = {}
+check_struct['vertices'] = syn_struct['vertices']
+check_struct['segments'] = np.array([seg for i,seg in enumerate(syn_struct['segments'].tolist()) \
+                                     if i not in remlist])
+
+# Triangulate the structure
+tri_struct = tr.triangulate(check_struct,opts='p')
+
+# Plot figure
+geom_syn_vertices,geom_syn_segments = get_vertseg_geometry(check_struct)
+
+fig = plt.figure(figsize=(15,40))
+ax1 = fig.add_subplot(111)
+# draw_points(ax1,geom_syn_vertices,color='blue',size=1,alpha=1.0,marker='o')
+draw_lines(ax1,geom_syn_segments,color='blue',width=2.0,style='solid',alpha=1.0,
+           directed=False)
+ax1.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+
+
+
+
+sys.exit(0)
+
+
 # Structure with added segments
-struct = get_combined_structure(new_geom1 + new_geom2 + extra_geom)
+struct = get_structure(new_geom1 + new_geom2 + extra_geom)
+print("Task completed: Obtained vertices and segments for constrained triangulation")
+
 
 #%% Constrained triangulation and flat norm computation
 # Constrained triangulation
@@ -275,10 +346,11 @@ for tgl in tri_struct['triangles']:
     if ([tgl[2],tgl[0]] not in edges) and ([tgl[0],tgl[2]] not in edges):
         edges.append([tgl[2],tgl[0]])
 tri_struct['edges'] = np.array(edges)
+sys.exit(0)
 
 #%% Flat norm computation
-T1 = get_current(tri_struct, new_geom1)
-T2 = get_current(tri_struct, new_geom2)
+T1 = get_current(tri_struct, sorted_act_geom)
+T2 = get_current(tri_struct, sorted_syn_geom)
 
 T = T1 - T2
 
@@ -297,20 +369,21 @@ geom_edges = [LineString(vertices[e]) for e in edges]
 
 
 #%% Get the geometries
-geom1_vertices = [Point(v) for v in act_struct['vertices'].tolist()]
-geom2_vertices = [Point(v) for v in syn_struct['vertices'].tolist()]
-geom1_segments = [LineString((act_struct['vertices'][c[0]],
-                              act_struct['vertices'][c[1]])) \
-                  for c in act_struct['segments']]
-geom2_segments = [LineString((syn_struct['vertices'][c[0]],
-                              syn_struct['vertices'][c[1]])) \
-                  for c in syn_struct['segments']]
+
+geom1_vertices,geom1_segments = get_vertseg_geometry(act_geom)
+geom2_vertices,geom2_segments = get_vertseg_geometry(syn_geom)
+
+geom_vertices = [Point(v) for v in struct['vertices'].tolist()]
+geom_segments = [LineString((struct['vertices'][c[0]],
+                             struct['vertices'][c[1]])) \
+                  for c in struct['segments']]
+
 
 
     
 #%% Plot the geometries
-fig = plt.figure(figsize=(20,20))
-ax1 = fig.add_subplot(111)
+fig = plt.figure(figsize=(30,40))
+ax1 = fig.add_subplot(121)
 draw_points(ax1,geom1_vertices,color='red',size=20,alpha=1.0,marker='o')
 draw_lines(ax1,geom1_segments,color='red',width=1.0,style='solid',alpha=1.0,
            directed=False,label='Actual Network')
@@ -319,3 +392,10 @@ draw_lines(ax1,geom2_segments,color='blue',width=1.0,style='solid',alpha=1.0,
            directed=False,label='Synthetic Network')
 ax1.legend(fontsize=20, markerscale=3)
 ax1.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+
+ax2 = fig.add_subplot(122)
+draw_points(ax2,geom_vertices,color='magenta',size=20,alpha=1.0,marker='o')
+draw_lines(ax2,geom_segments,color='magenta',width=1.0,style='solid',alpha=1.0,
+           directed=False)
+ax2.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+
