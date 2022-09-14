@@ -258,44 +258,6 @@ ax2.legend(fontsize=20, markerscale=3)
 fig.savefig(workpath+'/figs/graph-sample.png',bbox_inches='tight')
 
 
-#%% Find area between a pair of currents
-
-tri1 = constrained_triangulation(struct1)
-tri2 = constrained_triangulation(struct2)
-
-
-cur1 = get_current(tri1)
-cur2 = get_current(tri2)
-
-
-lambda_1 = 1
-x,s,norm = msfn(tri1['vertices'], tri1['simplices'], tri1['subsimplices'], 
-                cur1, lambda_1)
-flat_lines1 = get_flat_approx(x, tri1['vertices'], tri1['subsimplices'])
-
-x,s,norm = msfn(tri2['vertices'], tri2['simplices'], tri2['subsimplices'], 
-                cur1, lambda_1)
-flat_lines2 = get_flat_approx(x, tri2['vertices'], tri2['subsimplices'])
-
-fig = plt.figure(figsize=(10,10))
-ax1 = fig.add_subplot(211)
-draw_points(ax1,geom1_vertices,color='blue',size=0.1,alpha=0.4,marker='o')
-draw_lines(ax1,geom1_segments,color='blue',width=1.0,style='solid',alpha=0.2)
-draw_lines(ax1,flat_lines1,color='green',width=1.0,style='solid',alpha=1.0,directed=True)
-ax1.set_title("Geometry 1",fontsize=25)
-# ax1.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
-ax2 = fig.add_subplot(212)
-draw_points(ax2,geom2_vertices,color='blue',size=0.1,alpha=0.4,marker='o')
-draw_lines(ax2,geom2_segments,color='blue',width=1.0,style='solid',alpha=0.2)
-draw_lines(ax2,flat_lines2,color='green',width=1.0,style='solid',alpha=1.0,directed=True)
-ax2.set_title("Geometry 2",fontsize=25)
-# ax2.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
-
-
-
-#%% Combined geometry 
-
-struct = structure(geom1+geom2)
 
 
 

@@ -10,6 +10,10 @@ from __future__ import absolute_import
 import sys,os
 import numpy as np
 from scipy import sparse
+import geopandas as gpd
+from shapely.geometry import LineString, Point, Polygon, MultiLineString
+import triangle as tr
+import matplotlib.pyplot as plt
 
 workpath = os.getcwd()
 libpath = workpath + "/libs/"
@@ -17,73 +21,39 @@ sys.path.append(libpath)
 
 from pyUtilslib import simpvol, boundary_matrix
 from pyLPsolverlib import lp_solver
-
-#%% Plot functions
-import geopandas as gpd
-from shapely.geometry import LineString, Point, Polygon
-import triangle as tr
-import matplotlib.pyplot as plt
+from pyDrawNetworklib import plot_input, plot_intermediate_result, plot_triangulation, plot_norm
 
 
-def draw_points(ax,points,color='red',size=10,alpha=1.0,marker='o',label=None):
-    if len(points) == 0:
-        return ax
-    if isinstance(points,list):
-        d = {'nodes':range(len(points)),
-             'geometry':[pt_geom for pt_geom in points]}
-    elif isinstance(points,dict):
-        d = {'nodes':range(len(points)),
-             'geometry':[points[k] for k in points]}
-    df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_nodes.plot(ax=ax,color=color,markersize=size,alpha=alpha,marker=marker,label=label)
-    return ax
+#%% Flat norm theory
+import scipy.stats as stats
+import math
 
-def draw_lines(ax,lines,color='red',width=2.0,style='solid',alpha=1.0,label=None,
-               directed=False):
-    if isinstance(lines,LineString):
-        lines = [lines]
-    if len(lines) == 0:
-        return ax
-    d = {'edges':range(len(lines)),
-         'geometry':[line_geom for line_geom in lines]}
-    df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_edges.plot(ax=ax,edgecolor=color,linewidth=width,
-                  linestyle=style,alpha=alpha,label=label)
-    if directed:
-        for line_geom in lines:
-            arrow_width=0.03
-            head_width = 2.5 * arrow_width
-            head_length = 2 * arrow_width
-            
-            cp0 = np.array(line_geom.coords[0])
-            cp1 = np.mean(line_geom.coords,axis=0)
-            
-            delta = cos, sin = (cp1 - cp0) / np.hypot(*(cp1 - cp0))
-            length = Point(cp0).distance(Point(cp1))
-            x_pos, y_pos = (
-            (cp0 + cp1) / 2  - delta * length / 2)
-            ax.arrow(x_pos, y_pos, cos * length, sin * length,ec=color,fc=color,
-                     head_width=head_width, head_length=head_length,ls='--', 
-                     shape='full',length_includes_head=True)
-    return ax
+mu1 = 0
+variance1 = 49
+sigma1 = math.sqrt(variance1)
+mu2 = 100
+variance2 = 169
+sigma2 = math.sqrt(variance2)
 
-def draw_polygons(ax,polygons,color='red',alpha=1.0,label=None):
-    if len(polygons) == 0:
-        return ax
-    if isinstance(polygons,list):
-        d = {'nodes':range(len(polygons)),
-             'geometry':[geom for geom in polygons]}
-    elif isinstance(polygons,dict):
-        d = {'nodes':range(len(polygons)),
-             'geometry':[polygons[k] for k in polygons]}
-    df_polygons = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_polygons.plot(ax=ax,facecolor=color,alpha=alpha,label=label)
-    return ax
+x = np.linspace(mu1 - 10*sigma1, mu2 + 7*sigma2, 1000 )
+
+fig = plt.figure(figsize=(10,6))
+ax = fig.add_subplot(111)
+ax.plot(x, stats.norm.pdf(x, mu1, sigma1)+stats.norm.pdf(x, mu2, sigma2))
 
 
+
+
+
+
+
+
+
+sys.exit(0)
 
 #%% MSFN definition
-def msfn(points, simplices, subsimplices, input_current, lambda_, w=[], v=[], cons=[]):
+def msfn(points, simplices, subsimplices, input_current, lambda_, 
+         w=[], v=[], cons=[],k=1):
     '''
     MSFN - Multiscale flat norm
     Accepts simplicial settings, an input current, multiscale factor(:math:`\lambda`).
@@ -105,13 +75,15 @@ def msfn(points, simplices, subsimplices, input_current, lambda_, w=[], v=[], co
     m_subsimplices = subsimplices.shape[0]
     n_simplices = simplices.shape[0]
     if w == []:
-        w = simpvol(points, subsimplices)
+        w = simpvol(points, subsimplices, k=k)
     if v == []:
-        v = simpvol(points, simplices)
+        v = simpvol(points, simplices, k=k)
     if cons == []:
         b_matrix = boundary_matrix(simplices, subsimplices, format='coo')
         m_subsimplices_identity = sparse.identity(m_subsimplices, dtype=np.int8, format='coo')
         cons = sparse.hstack((m_subsimplices_identity, -m_subsimplices_identity, b_matrix, -b_matrix))
+    
+    # compute the flat norm distance
     c = np.concatenate((abs(w), abs(w), lambda_*abs(v), lambda_*abs(v))) 
     c.reshape(len(c),1)
     sol, norm = lp_solver(c, cons, input_current)
@@ -119,27 +91,31 @@ def msfn(points, simplices, subsimplices, input_current, lambda_, w=[], v=[], co
     s = (sol[2*m_subsimplices:2*m_subsimplices+n_simplices] - sol[2*m_subsimplices+n_simplices:]).reshape(1, n_simplices).astype(int)
     return x, s, norm
 
-def get_flat_approx(x,points,simplices):
-    flat_lines = []
-    m = simplices.shape[0]
-    for i in range(m):
-        if x[0,i] == 1:
-            flat_lines.append(LineString(points[simplices[i,:]]))
-        elif x[0,i] == -1:
-            flat_lines.append(LineString(points[simplices[i,:]][::-1]))
-    return flat_lines
-
 #%% Functions to create data structure for triangulation
-def get_geometry(input_geometry):
-    out_geometry = []
-    for geom in input_geometry:
-        geom_vertices = [Point(c) for c in geom.coords]
-        for i in range(len(geom_vertices)-1):
-            out_geometry.append(LineString((geom_vertices[i],
-                                            geom_vertices[i+1])))
-    return out_geometry
+def get_geometry(geometry):
+    vertices = [Point(c) for c in geometry.coords]
+    return [LineString((pt1,pt2)) \
+            for pt1,pt2 in zip(vertices,vertices[1:]) \
+                if pt1.distance(pt2) > 1e-6]
 
-def get_combined_structure(geometry):
+
+def get_current(triangle_structure,geometry):
+    current = []
+    vertices = triangle_structure['vertices'].tolist()
+    for edge in triangle_structure['edges'].tolist():
+        vert1 = Point(vertices[edge[0]])
+        vert2 = Point(vertices[edge[1]])
+        forward_geom = LineString((vert1,vert2))
+        reverse_geom = LineString((vert2,vert1))
+        if forward_geom in geometry:
+            current.append(1)
+        elif reverse_geom in geometry:
+            current.append(-1)
+        else:
+            current.append(0)
+    return np.array(current)
+
+def get_structure(geometry):
     vertices = []
     for geom in geometry:
         geom_vertices = [Point(c) for c in geom.coords]
@@ -155,182 +131,165 @@ def get_combined_structure(geometry):
               'segments':np.array(segments)}
     return struct
 
-def get_intersections(geom1,geom2):
-    points = [g1.intersection(g2) for g1 in geom1 \
-              for g2 in geom2 if g1.intersects(g2)]
-    return points
 
-def get_segments(points):
-    start = points[0]
+def get_segments(points,start):
     sorted_indices = np.argsort([p.distance(start) for p in points])
     sorted_points = [points[i] for i in sorted_indices]
     return [LineString((sorted_points[i],sorted_points[i+1])) \
             for i in range(len(points)-1)]
 
-def update_segment(segments,intersections):
+def update_segment(segments,vertices):
     seg = []
     for g in segments:
-        gpt1 = Point(g.coords[0])
-        gpt2 = Point(g.coords[1])
         pt_list = []
-        for pt in intersections:
-            if g.distance(pt) < 1e-8:
-                pt_list.append(pt)
-        pt_list = [gpt1] + pt_list + [gpt2]
-        seg.extend(get_segments(pt_list))
+        for pt in vertices:
+            if g.distance(Point(pt)) < 1e-8:
+                pt_list.append(Point(pt))
+        seg.extend(get_segments(pt_list,Point(g.coords[0])))
     return seg
 
-def get_current(triangle_structure,input_geometry):
-    current = []
-    
-    vertices = triangle_structure['vertices'].tolist()
-    edges = triangle_structure['edges'].tolist()
-    
-    for edge in edges:
-        vert1 = Point(vertices[edge[0]])
-        vert2 = Point(vertices[edge[1]])
-        forward_geom = LineString((vert1,vert2))
-        reverse_geom = LineString((vert2,vert1))
-        if forward_geom in input_geometry:
-            current.append(1)
-        elif reverse_geom in input_geometry:
-            current.append(-1)
-        else:
-            current.append(0)
-    return np.array(current)
+def prepare_triangulation(segments1,segments2):
+    # Add rectangle envelope bounding the segments
+    all_lines = MultiLineString(segments1+segments2)
+    rect_env = list(all_lines.minimum_rotated_rectangle.buffer(0.1).boundary.coords)
+    extra_geom = [LineString((Point(rect_env[i]),Point(rect_env[i+1]))) \
+                  for i in range(len(rect_env)-1)]
+
+    # Structure with added segments
+    struct = get_structure(extra_geom + segments1 + segments2)
+    # print(len(extra_geom))
+    return struct
 
 
-def get_vertseg_geometry(geometry):
-    struct = get_combined_structure(geometry)
-    geom_vertices = [Point(v) for v in struct['vertices'].tolist()]
-    geom_segments = [LineString((struct['vertices'][c[0]],
-                                 struct['vertices'][c[1]])) \
-                      for c in struct['segments']]
-    return geom_vertices, geom_segments
+def perform_triangulation(act_geom,syn_geom,adj=1):
+    # Initialize dictionary
+    dict_struct = {}
+    
+    # Prepare triangulation
+    struct = prepare_triangulation(act_geom,syn_geom)
+    dict_struct['intermediate'] = struct
+    print("Task completed: Obtained vertices and segments for constrained triangulation")
+    
+    # Perform constrained triangulation
+    vertices = struct['vertices']
+    adj_vertices = adj*(vertices + np.column_stack([[80]*len(vertices), 
+                                               [-37]*len(vertices)]))
+    adj_struct = {'vertices': adj_vertices,
+                  'segments':struct['segments']}
+    try:
+        adj_tri_struct = tr.triangulate(adj_struct,opts='ps')
+        adj_tri_vertices = adj_tri_struct['vertices']
+        adj_mat = np.column_stack([[80]*len(adj_tri_vertices),
+                                   [-37]*len(adj_tri_vertices)])
+        tri_struct = {'vertices':(adj_tri_vertices/adj) - adj_mat,
+                      'segments':adj_tri_struct['segments'],
+                      'triangles':adj_tri_struct['triangles']}
+        
+        edges = []
+        for tgl in tri_struct['triangles']:
+            if ([tgl[0],tgl[1]] not in edges) and ([tgl[1],tgl[0]] not in edges):
+                edges.append([tgl[0],tgl[1]])
+            if ([tgl[1],tgl[2]] not in edges) and ([tgl[2],tgl[1]] not in edges):
+                edges.append([tgl[1],tgl[2]])
+            if ([tgl[2],tgl[0]] not in edges) and ([tgl[0],tgl[2]] not in edges):
+                edges.append([tgl[2],tgl[0]])
+        tri_struct['edges'] = np.array(edges)
+        dict_struct['triangulated'] = tri_struct
+        print("Task completed: Performed triangulation on points")
+        
+        # update input geometries with intersecting points
+        V = tri_struct['vertices'].tolist()
+        dict_struct['actual'] = update_segment(act_geom, V)
+        dict_struct['synthetic'] = update_segment(syn_geom, V)
+        print("Task completed: Updated geometries with intersecting points")
+    
+    except:
+        print("Failed triangulation!!!")
+        dict_struct['actual'] = act_geom
+        dict_struct['synthetic'] = syn_geom
+        dict_struct['triangulated'] = None
+    
+    return dict_struct
 
 
 #%% Toy Example
 
 # Input geometries
-geom1 = [LineString((Point(0,0),Point(1,1))),
+in_geom1 = [LineString((Point(0,0),Point(1,1))),
          LineString((Point(1,1),Point(2,0))),
          LineString((Point(2,0),Point(3,1),Point(4,0)))]
-geom2 = [LineString((Point(0,0.5),Point(2,0.5),Point(4,0.5)))]
+in_geom2 = [LineString((Point(0,0.5),Point(2,0.5),Point(4,0.5)))]
 
-geom1 = get_geometry(geom1)
-geom2 = get_geometry(geom2)
+def construct_geom(points):
+    return [LineString([Point(p) for p in pt_list]) for pt_list in points]
 
-# Get intersection of geometries
-pt_intersect = get_intersections(geom1, geom2)
+in_geom1 = construct_geom([[(-1,0),(0,0),(0,-1),(1,-1)],[(0,0),(1,0)]])
+in_geom2 = construct_geom([[(-1,-1),(1,0.5)],[(-1,-0.5),(0,0.25),(1,0.25)],
+                           [(0,0.25),(-1,0.25)]])
+    
 
-# Update geometries with new points and segments
-new_geom1 = update_segment(geom1,pt_intersect)
-new_geom2 = update_segment(geom2,pt_intersect)
+geom1 = []
+geom2 = []
+for g in in_geom1:
+    geom1.extend(get_geometry(g))
+for g in in_geom2:
+    geom2.extend(get_geometry(g))
 
-# Combine geometries for triangulation
-struct = get_combined_structure(new_geom1 + new_geom2)
-
-# Add vertices and segments to surround the area
-vert_cords = struct['vertices']
-min_cord = np.min(vert_cords,axis=0) - 0.5
-max_cord = np.max(vert_cords,axis=0) + 0.5
-extra_vert = [min_cord,[min_cord[0],max_cord[1]],
-              max_cord,[max_cord[0],min_cord[1]],min_cord]
-extra_geom = [LineString((extra_vert[i],extra_vert[i+1])) for i in range(4)]
-
-# Structure with added segments
-struct = get_combined_structure(new_geom1 + new_geom2 + extra_geom)
+D = perform_triangulation(geom1,geom2,adj=1)
 
 
-# Constrained triangulation
-tri_struct = tr.triangulate(struct,opts='p')
-edges = []
-for tgl in tri_struct['triangles']:
-    if ([tgl[0],tgl[1]] not in edges) and ([tgl[1],tgl[0]] not in edges):
-        edges.append([tgl[0],tgl[1]])
-    if ([tgl[1],tgl[2]] not in edges) and ([tgl[2],tgl[1]] not in edges):
-        edges.append([tgl[1],tgl[2]])
-    if ([tgl[2],tgl[0]] not in edges) and ([tgl[0],tgl[2]] not in edges):
-        edges.append([tgl[2],tgl[0]])
-tri_struct['edges'] = np.array(edges)
+if D['triangulated'] == None:
+    fig_ = plot_intermediate_result(D)
+    sys.exit(0)
 
 
-T1 = get_current(tri_struct,new_geom1)
-T2 = get_current(tri_struct,new_geom2)
+T1 = get_current(D['triangulated'], D['actual'])
+T2 = get_current(D['triangulated'], D['synthetic'])
+
+print("Task completed: obtained current information")
+
 T = T1 - T2
 
-lambda_1 = 0.001
-x,s,norm = msfn(tri_struct['vertices'], tri_struct['triangles'], tri_struct['edges'], 
-                T, lambda_1)
+print(sum(abs(T1)))
+print(len(D['actual']))
+print(sum(abs(T2)))
+print(len(D['synthetic']))
 
+lambda_ = 0.001
+x,s,norm = msfn(D['triangulated']['vertices'], D['triangulated']['triangles'], 
+                D['triangulated']['edges'], T, lambda_,k=1)
 
-vertices = tri_struct['vertices']
-triangles = tri_struct['triangles'][s[0]!=0]
-edges = tri_struct['edges'][x[0]!=0]
-
-geom_triangles = [Polygon(vertices[np.append(t,t[0])]) for t in triangles]
-geom_edges = [LineString(vertices[e]) for e in edges]
-
-
+print("The computed simplicial flat norm is:",norm)
 
 #%% Plot the example
-geom1_vertices,geom1_segments = get_vertseg_geometry(geom1)
-geom2_vertices,geom2_segments = get_vertseg_geometry(geom2)
-new_geom1_vertices,new_geom1_segments = get_vertseg_geometry(new_geom1)
-new_geom2_vertices,new_geom2_segments = get_vertseg_geometry(new_geom2)
-
-
-
-
-geom_all_vertices = [Point(v) for v in struct['vertices'].tolist()]
-geom_all_segments = [LineString((struct['vertices'][c[0]],
-                                 struct['vertices'][c[1]])) \
-                      for c in struct['segments']]
-geom_vertices = [Point(v) for v in tri_struct['vertices'].tolist()]
-geom_subsimplices = [LineString((tri_struct['vertices'][c[0]],
-                                 tri_struct['vertices'][c[1]])) \
-                      for c in tri_struct['edges']]
-
-
 
     
 fig = plt.figure(figsize=(20,10))
+# Plot 1: Plot the geometries of the pair of networks
 ax1 = fig.add_subplot(221)
-draw_points(ax1,geom1_vertices,color='red',size=20,alpha=1.0,marker='o')
-draw_lines(ax1,geom1_segments,color='red',width=1.0,style='solid',alpha=1.0,
-           directed=False,label='Ground Truth Geometry')
-draw_points(ax1,geom2_vertices,color='blue',size=20,alpha=1.0,marker='o')
-draw_lines(ax1,geom2_segments,color='blue',width=1.0,style='solid',alpha=1.0,
-           directed=False,label='Estimated Geometry')
-ax1.legend(fontsize=15, markerscale=2)
-
+ax1 = plot_input(geom1,geom2,ax1)
+# Plot 2: All segments and points in the pre-triangulated phase
 ax2 = fig.add_subplot(222)
-draw_points(ax2,new_geom1_vertices,color='red',size=20,alpha=1.0,marker='o')
-draw_lines(ax2,new_geom1_segments,color='red',width=1.0,style='solid',alpha=1.0,
-            directed=False,label='Ground Truth Geometry')
-draw_points(ax2,new_geom2_vertices,color='blue',size=20,alpha=1.0,marker='o')
-draw_lines(ax2,new_geom2_segments,color='blue',width=1.0,style='solid',alpha=1.0,
-            directed=False,label='Estimated Geometry')
-ax2.legend(fontsize=15, markerscale=2)
-
-
+ax2 = plot_intermediate_result(D["intermediate"],ax2)
+# Plot 3: Post-triangulation phase with currents
 ax3 = fig.add_subplot(223)
-draw_points(ax3,geom_all_vertices,color='magenta',size=20,alpha=1.0,marker='o')
-draw_lines(ax3,geom_all_segments,color='magenta',width=1.0,style='solid',alpha=1.0,
-           directed=False)
-
-
+ax3 = plot_triangulation(D["triangulated"],T1,T2,ax3)
+# Plot 4: flat-norm computation
 ax4 = fig.add_subplot(224)
-draw_points(ax4,geom_vertices,color='black',size=20,alpha=0.5,marker='o')
-draw_lines(ax4,geom_subsimplices,color='black',width=0.5,style='dashed',alpha=0.5,
-           directed=False)
-draw_lines(ax4,geom_edges,color='green',width=3.0,style='solid',alpha=1.0,
-           directed=False)
-draw_polygons(ax4,geom_triangles,color='magenta',alpha=0.4,label=None)
+ax4 = plot_norm(D["triangulated"],x,s,ax4)
 
 
-
-
+#%% Plot for multiple lambdas
+for lambda_ in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,
+                2,3,4,5,6,7,8,9,10]:
+    x,s,norm = msfn(D['triangulated']['vertices'], D['triangulated']['triangles'], 
+                    D['triangulated']['edges'], T, lambda_,k=1)
+    print("The computed simplicial flat norm is:",norm)
+    fig = plt.figure(figsize=(20,10))
+    ax1 = fig.add_subplot(121)
+    ax1 = plot_triangulation(D["triangulated"],T1,T2,ax1)
+    ax2 = fig.add_subplot(122)
+    ax2 = plot_norm(D["triangulated"],x,s,ax2)
 
 
 

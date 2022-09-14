@@ -126,3 +126,16 @@ def partitions(limits,kx,ky,x0=0,y0=0):
             grid.append(Grid(vertices))
     return grid
 
+#%% 
+def approx_geodist(geomA,geomB):
+    k = np.pi/180.0
+    if type(geomA) == Point: geomA = (geomA.x,geomA.y)
+    if type(geomB) == Point: geomB = (geomB.x,geomB.y)
+    
+    # approximate arc difference
+    rad_diff = k*(np.array(geomA) - np.array(geomB))
+    phi = np.sqrt(np.sum(rad_diff**2))
+    R = 6378388
+    return R*phi
+    
+

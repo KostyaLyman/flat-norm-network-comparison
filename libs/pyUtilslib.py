@@ -13,7 +13,6 @@ import numpy as np
 from scipy.linalg import det
 from scipy.special import factorial
 from scipy.sparse import dok_matrix
-from geographiclib.geodesic import Geodesic
 
 
 def get_subsimplices(simplices):
@@ -43,53 +42,8 @@ def orient_simplices(points, simplices):
                 simplices[i] = simplices[i,[1,0,2,3]]
     return simplices
 
-def simpvol_geod(points,simplices):
-    """
-    Geodesic volume of a simplex
-
-    Parameters
-    ----------
-    points : TYPE
-        DESCRIPTION.
-    simplices : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-
-    """
-    point_dim  =  points.shape[1]
-    simp_dim = simplices.shape[1]
-    geod = Geodesic.WGS84
-    if simp_dim == 2:
-        lon1 = points[simplices[:,0],0]
-        lon2 = points[simplices[:,1],0]
-        lat1 = points[simplices[:,0],1]
-        lat2 = points[simplices[:,1],1]
-        volume = np.array([geod.Inverse(lt1, ln1, lt2, ln2)['s12'] \
-                        for lt1,ln1,lt2,ln2 in zip(lat1,lon1,lat2,lon2)])
-    elif point_dim  ==  2 and simp_dim == 3:
-        lon1 = points[simplices[:,0],0]
-        lon2 = points[simplices[:,1],0]
-        lon3 = points[simplices[:,2],0]
-        lat1 = points[simplices[:,0],1]
-        lat2 = points[simplices[:,1],1]
-        lat3 = points[simplices[:,2],1]
-        d12 = np.array([geod.Inverse(lt1, ln1, lt2, ln2)['s12'] \
-                        for lt1,ln1,lt2,ln2 in zip(lat1,lon1,lat2,lon2)])
-        d23 = np.array([geod.Inverse(lt2, ln2, lt3, ln3)['s12'] \
-                        for lt2,ln2,lt3,ln3 in zip(lat2,lon2,lat3,lon3)])
-        d31 = np.array([geod.Inverse(lt3, ln3, lt1, ln1)['s12'] \
-                        for lt3,ln3,lt1,ln1 in zip(lat3,lon3,lat1,lon1)])
-        s = (d12+d23+d31)/2
-        volume = np.sqrt(s*(s-d12)*(s-d23)*(s-d31))
-    else:
-        print("Cannot compute the geodesic volume for the simplex")
-        sys.exit(0)
-    return volume
     
-def simpvol(points, simplices):
+def simpvol(points, simplices, k=1):
 
     ''' SIMPVOL Simplex volume.
         V=SIMPVOL(points, simplices)
@@ -105,12 +59,12 @@ def simpvol(points, simplices):
         volume = np.abs(d12)
     # 1-simplex, edge in any dimension
     elif simp_dim == 2:
-        d12 = points[simplices[:,1],:] - points[simplices[:,0],:]
+        d12 = k*(points[simplices[:,1],:] - points[simplices[:,0],:])
         volume = np.sqrt(np.sum(d12**2, axis=1))
     # 2-simplex, triangle in 2 dimension
     elif point_dim  ==  2 and simp_dim == 3:
-        d12 = points[simplices[:,1],:] - points[simplices[:,0],:]
-        d13 = points[simplices[:,2],:] - points[simplices[:,0],:]
+        d12 = k*(points[simplices[:,1],:] - points[simplices[:,0],:])
+        d13 = k*(points[simplices[:,2],:] - points[simplices[:,0],:])
         volume = (np.multiply(d12[:,0], d13[:,1]) - np.multiply(d12[:,1], d13[:,0]))*1.0/2
     # 2-simplex, triangle in 3 dimension
     elif point_dim == 3 and simp_dim == 3:
