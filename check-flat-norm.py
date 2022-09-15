@@ -419,7 +419,7 @@ ax3 = plot_triangulation(D["triangulated"],T1,T2,ax3)
 
 
 
-sys.exit(0)
+# sys.exit(0)
 #%% Perform flat norm computation
 # lambda_ = 1000
 for lambda_ in np.linspace(1000,100000,10):
@@ -431,12 +431,17 @@ for lambda_ in np.linspace(1000,100000,10):
     fig = plt.figure(figsize=(60,40))
     ax = fig.add_subplot(111)
     plot_norm(D["triangulated"],x,s,ax)
-    ax.set_title("Flat norm scale, lambda = "+str(lambda_), fontsize=30)
+    ax.set_title("Flat norm scale, lambda = "+str(int(lambda_)), fontsize=60)
     filename = area+'-lambda-'+str(lambda_)
     fig.savefig(workpath+'/figs/'+filename+'.png',bbox_inches='tight')
     # sys.exit(0)
 
 
-
+#%% Flat norm computation for multiple lambda
+for lambda_ in np.linspace(1000,100000,100):
+    x,s,norm = msfn(D['triangulated']['vertices'], D['triangulated']['triangles'], 
+                    D['triangulated']['edges'], T, lambda_,k=np.pi/(180.0))
+    with open(outpath+"flat-norm.txt",'a') as f:
+        f.write(str(int(lambda_))+"\t"+str(norm)+"\n")
 
 

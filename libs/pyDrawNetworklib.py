@@ -432,7 +432,21 @@ def plot_triangulation(tri_struct,t1,t2,ax):
     return ax
 
 
-
+def plot_regions(act_geom,syn_geom,geom_regions,ax):
+    # Get the geometries
+    geom1_vertices,geom1_segments = get_vertseg_geometry(act_geom)
+    geom2_vertices,geom2_segments = get_vertseg_geometry(syn_geom)
+    # Plot 1: Plot the geometries of the pair of networks
+    draw_points(ax,geom1_vertices,color='red',size=20,alpha=1.0,marker='o')
+    draw_lines(ax,geom1_segments,color='red',width=2.0,style='solid',alpha=1.0,
+               directed=False,label='Actual Network')
+    draw_points(ax,geom2_vertices,color='blue',size=20,alpha=1.0,marker='o')
+    draw_lines(ax,geom2_segments,color='blue',width=2.0,style='solid',alpha=1.0,
+               directed=False,label='Synthetic Network')
+    # ax.legend(fontsize=20, markerscale=3)
+    draw_polygons(ax,geom_regions,color='cyan',alpha=0.2,label=None)
+    ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+    return ax
 
 
 
