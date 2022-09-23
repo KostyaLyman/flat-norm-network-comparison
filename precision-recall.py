@@ -26,7 +26,7 @@ outpath = workpath + "/out/"
 
 from pyExtractDatalib import GetDistNet
 from pyFlatNormlib import get_geometry, get_current, msfn, perform_triangulation
-from pyDrawNetworklib import plot_norm, plot_intermediate_result, plot_input
+from pyDrawNetworklib import plot_norm, plot_intermediate_result, plot_input, plot_failed_triangulation
 from pyDrawNetworklib import plot_regions, plot_triangulation
 
 
@@ -107,7 +107,7 @@ for k,region in enumerate(region_list):
     # Flat norm computation
     D = perform_triangulation(sorted_act_geom,sorted_syn_geom,adj=1000)
     if D['triangulated'] == None:
-        fig_ = plot_intermediate_result(D)
+        fig_ = plot_failed_triangulation(D)
         sys.exit(0)
     
     

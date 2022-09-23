@@ -36,8 +36,8 @@ def get_current(triangle_structure,geometry):
         vert2 = Point(vertices[edge[1]])
         forward_geom = LineString((vert1,vert2))
         reverse_geom = LineString((vert2,vert1))
-        for_eq = [forward_geom.almost_equals(geom) for geom in geometry]
-        rev_eq = [reverse_geom.almost_equals(geom) for geom in geometry]
+        for_eq = [forward_geom.equals_exact(geom,1e-6) for geom in geometry]
+        rev_eq = [reverse_geom.equals_exact(geom,1e-6) for geom in geometry]
         if sum(for_eq)>0:
             current.append(1)
         elif sum(rev_eq)>0:
@@ -92,14 +92,15 @@ def prepare_triangulation(segments1,segments2):
     return struct
 
 
-def perform_triangulation(act_geom,syn_geom,adj=1):
+def perform_triangulation(act_geom,syn_geom,adj=1,verbose=False):
     # Initialize dictionary
     dict_struct = {}
     
     # Prepare triangulation
     struct = prepare_triangulation(act_geom,syn_geom)
     dict_struct['intermediate'] = struct
-    print("Task completed: Obtained vertices and segments for constrained triangulation")
+    if verbose:
+        print("Task completed: Obtained vertices and segments for constrained triangulation")
     
     # Perform constrained triangulation
     vertices = struct['vertices']
@@ -126,13 +127,15 @@ def perform_triangulation(act_geom,syn_geom,adj=1):
                 edges.append([tgl[2],tgl[0]])
         tri_struct['edges'] = np.array(edges)
         dict_struct['triangulated'] = tri_struct
-        print("Task completed: Performed triangulation on points")
+        if verbose:
+            print("Task completed: Performed triangulation on points")
         
         # update input geometries with intersecting points
         V = tri_struct['vertices'].tolist()
         dict_struct['actual'] = update_segment(act_geom, V)
         dict_struct['synthetic'] = update_segment(syn_geom, V)
-        print("Task completed: Updated geometries with intersecting points")
+        if verbose:
+            print("Task completed: Updated geometries with intersecting points")
     
     except:
         print("Failed triangulation!!!")
@@ -181,4 +184,8 @@ def msfn(points, simplices, subsimplices, input_current, lambda_,
     sol, norm = lp_solver(c, cons, input_current)
     x = (sol[0:m_subsimplices] - sol[m_subsimplices:2*m_subsimplices]).reshape((1,m_subsimplices)).astype(int)
     s = (sol[2*m_subsimplices:2*m_subsimplices+n_simplices] - sol[2*m_subsimplices+n_simplices:]).reshape(1, n_simplices).astype(int)
-    return x, s, norm
+    
+    # Compute the two parts of the norm
+    norm_subsimplices = np.dot(abs(x),abs(w))[0]
+    norm_simplices = np.dot(abs(s),abs(v))[0]
+    return x, s, norm, norm_subsimplices, norm_simplices

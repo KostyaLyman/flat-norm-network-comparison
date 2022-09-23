@@ -449,7 +449,19 @@ def plot_regions(act_geom,syn_geom,geom_regions,ax):
     return ax
 
 
-
+def plot_failed_triangulation(dict_struct):
+    act_geom = dict_struct['actual']
+    syn_geom = dict_struct['synthetic']
+    struct = dict_struct['intermediate']
+    # Plot 1: Plot the geometries of the pair of networks
+    fig = plt.figure(figsize=(120,30))
+    ax1 = fig.add_subplot(121)
+    ax1 = plot_input(act_geom,syn_geom,ax1)
+    
+    # Plot 2: All segments and points in the pre-triangulated phase
+    ax2 = fig.add_subplot(122)
+    ax2 = plot_intermediate_result(struct,ax2)
+    return fig
 
 
 
