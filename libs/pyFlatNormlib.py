@@ -88,7 +88,6 @@ def prepare_triangulation(segments1,segments2):
 
     # Structure with added segments
     struct = get_structure(extra_geom + segments1 + segments2)
-    # print(len(extra_geom))
     return struct
 
 
