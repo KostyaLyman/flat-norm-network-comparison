@@ -31,18 +31,15 @@ from pyDrawNetworklib import plot_regions, plot_triangulation
 
 
 #%% Functions
-def random_regions(poly, num_regions = 5, epsilon = 2e-3):
+def random_points(poly, num_points = 5):
     min_x, min_y, max_x, max_y = poly.bounds
-
-    regions = []
-
-    while len(regions) < num_regions:
+    points = []
+    while len(points) < num_points:
         random_point = Point([np.random.uniform(min_x, max_x), 
                               np.random.uniform(min_y, max_y)])
         if (random_point.within(poly)):
-            regions.append(random_point.buffer(epsilon,cap_style=3))
-
-    return regions
+            points.append(random_point)
+    return points
 
 def sort_geometry(input_geometry):
     output_geometry = []
@@ -83,7 +80,9 @@ for e in syn_graph.edges:
     syngeom.extend(get_geometry(synth.edges[e]['geometry']))
 
 # Sample small regions within the convex hull
-region_list = random_regions(hull)
+epsilon = 2e-3
+point_list = random_points(hull)
+region_list = [pt.buffer(epsilon,cap_style=3) for pt in point_list]
 
 # Plot the sample regions
 fig = plt.figure(figsize=(40,60))
@@ -93,52 +92,124 @@ filename = area+'-regions'
 fig.savefig(workpath+'/figs/'+filename+'.png',bbox_inches='tight')
 
 #%% Compute flat norm for a region
-
-for k,region in enumerate(region_list):
-
+import pandas as pd
+import seaborn as sns
+def compute_flatnorm_region(point, geom1, geom2, 
+                            epsilon=2e-3, lambda_=1000, 
+                            verbose=False, plot = False):
+    # Get the region
+    region = point.buffer(epsilon,cap_style=3)
     # get the actual network edges in the region
-    reg_actgeom = [g for g in actgeom if g.intersects(region)]
-    reg_syngeom = [g for g in syngeom if g.intersects(region)]
+    reg_actgeom = [g for g in geom1 if g.intersects(region)]
+    reg_syngeom = [g for g in geom2 if g.intersects(region)]
     sorted_act_geom = sort_geometry(reg_actgeom)
     sorted_syn_geom = sort_geometry(reg_syngeom)
-    print("Task completed: Actual and synthetic network geometries sorted")
+    if verbose:
+        print("Task completed: Actual and synthetic network geometries sorted")
     
     
     # Flat norm computation
     D = perform_triangulation(sorted_act_geom,sorted_syn_geom,adj=1000)
     if D['triangulated'] == None:
-        fig_ = plot_failed_triangulation(D)
+        _ = plot_failed_triangulation(D)
         sys.exit(0)
     
     
     T1 = get_current(D['triangulated'], D['actual'])
     T2 = get_current(D['triangulated'], D['synthetic'])
     T = T1 - T2
-    print("Task completed: obtained current information")
-    
-    
-    # Perform flat norm computation
-    fig = plt.figure(figsize=(60,20))
-    # Plot 2: All segments and points in the pre-triangulated phase
-    ax1 = fig.add_subplot(2,6,1)
-    ax1 = plot_intermediate_result(D["intermediate"],ax1)
-    # Plot 3: Post-triangulation phase with currents
-    ax2 = fig.add_subplot(2,6,7)
-    ax2 = plot_triangulation(D["triangulated"],T1,T2,ax2)
-    for i,lambda_ in enumerate(np.linspace(1000,100000,10)):
-        x,s,norm = msfn(D['triangulated']['vertices'], D['triangulated']['triangles'], 
-                        D['triangulated']['edges'], T, lambda_,k=np.pi/(180.0))
-        
+    if verbose:
+        print("Task completed: obtained current information")
+
+    x,s,norm,norm1,norm2 = msfn(D['triangulated']['vertices'], 
+                                D['triangulated']['triangles'], 
+                                D['triangulated']['edges'], 
+                                T, lambda_,k=np.pi/(180.0))
+    if verbose:
         print("The computed simplicial flat norm is:",norm)
-        # Show results
-        quo = int(i / 5)
-        rem = i % 5
-        ax = fig.add_subplot(2,6,(6*quo)+(rem+2))
-        plot_norm(D["triangulated"],x,s,ax)
-        ax.set_title("Flat norm scale, lambda = "+str(int(lambda_)), fontsize=20)
-        
     
-    filename = area+'-region-norm-'+str(k+1)
-    fig.savefig(workpath+'/figs/'+filename+'.png',bbox_inches='tight')
+    if plot:
+        fig = plt.figure(figsize=(20,10))
+        ax1 = fig.add_subplot(1,2,1)
+        ax1 = plot_triangulation(D["triangulated"],T1,T2,ax1)
+        ax1.set_title("Radius of region = "+str(eps), fontsize=20)
+        ax2 = fig.add_subplot(1,2,2)
+        ax2 = plot_norm(D["triangulated"],x,s,ax2)
+        ax2.set_title("Flat norm scale, lambda = "+str(int(lamb)),fontsize=20)
+    
+    return norm, norm1, norm2
+
+
+
+# Get the norm values for varied lambda and epsilon
+plot_data = {'epsilon':[], 'lambda':[], 'flatnorm':[],
+             'norm_length':[], 'norm_area':[]}
+for eps in np.linspace(5e-4,2e-3,16):
+    for lamb in np.linspace(1000,100000,10):
+        n,n1,n2 = compute_flatnorm_region(point_list[2],actgeom,syngeom,
+                                          epsilon=eps, lambda_=lamb,
+                                          plot=False)
+        plot_data['epsilon'].append(eps)
+        plot_data['lambda'].append(lamb)
+        plot_data['flatnorm'].append(n)
+        plot_data['norm_length'].append(n1)
+        plot_data['norm_area'].append(n2)
+
+df = pd.DataFrame(plot_data)
+fig = plt.figure(figsize=(10,10))
+ax = fig.add_subplot(111)
+ax = sns.lineplot(data=df, x='lambda', y='flatnorm', hue='epsilon', ax=ax,
+                  markers = 'o',color=sns.color_palette("Set3"))
+
+#%% Compute flat norm for a region
+
+# for k,region in enumerate(region_list[2:3]):
+
+#     # get the actual network edges in the region
+#     reg_actgeom = [g for g in actgeom if g.intersects(region)]
+#     reg_syngeom = [g for g in syngeom if g.intersects(region)]
+#     sorted_act_geom = sort_geometry(reg_actgeom)
+#     sorted_syn_geom = sort_geometry(reg_syngeom)
+#     print("Task completed: Actual and synthetic network geometries sorted")
+    
+    
+#     # Flat norm computation
+#     D = perform_triangulation(sorted_act_geom,sorted_syn_geom,adj=1000)
+#     if D['triangulated'] == None:
+#         fig_ = plot_failed_triangulation(D)
+#         sys.exit(0)
+    
+    
+#     T1 = get_current(D['triangulated'], D['actual'])
+#     T2 = get_current(D['triangulated'], D['synthetic'])
+#     T = T1 - T2
+#     print("Task completed: obtained current information")
+    
+    
+#     # Perform flat norm computation
+#     fig = plt.figure(figsize=(60,20))
+#     # Plot 2: All segments and points in the pre-triangulated phase
+#     ax1 = fig.add_subplot(2,6,1)
+#     ax1 = plot_intermediate_result(D["intermediate"],ax1)
+#     # Plot 3: Post-triangulation phase with currents
+#     ax2 = fig.add_subplot(2,6,7)
+#     ax2 = plot_triangulation(D["triangulated"],T1,T2,ax2)
+#     for i,lambda_ in enumerate(np.linspace(1000,100000,10)):
+#         x,s,norm,_,_ = msfn(D['triangulated']['vertices'], 
+#                             D['triangulated']['triangles'], 
+#                             D['triangulated']['edges'], 
+#                             T, lambda_,k=np.pi/(180.0))
+        
+#         print("The computed simplicial flat norm is:",norm)
+#         # Show results
+#         quo = int(i / 5)
+#         rem = i % 5
+#         ax = fig.add_subplot(2,6,(6*quo)+(rem+2))
+#         plot_norm(D["triangulated"],x,s,ax)
+#         ax.set_title("Flat norm scale, lambda = "+str(int(lambda_)), fontsize=20)
+        
+#     sys.exit(0)
+#     filename = area+'-region-norm-'+str(k+1)
+#     fig.savefig(workpath+'/figs/'+filename+'.png',bbox_inches='tight')
 
 
