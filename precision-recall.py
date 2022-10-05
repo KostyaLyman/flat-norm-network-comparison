@@ -96,7 +96,8 @@ import pandas as pd
 import seaborn as sns
 def compute_flatnorm_region(point, geom1, geom2, 
                             epsilon=2e-3, lambda_=1000, 
-                            verbose=False, plot = False):
+                            verbose=False, plot = False,
+                            normalized=False):
     # Get the region
     region = point.buffer(epsilon,cap_style=3)
     # get the actual network edges in the region
@@ -118,13 +119,15 @@ def compute_flatnorm_region(point, geom1, geom2,
     T1 = get_current(D['triangulated'], D['actual'])
     T2 = get_current(D['triangulated'], D['synthetic'])
     T = T1 - T2
+    
     if verbose:
         print("Task completed: obtained current information")
 
     x,s,norm,norm1,norm2 = msfn(D['triangulated']['vertices'], 
                                 D['triangulated']['triangles'], 
                                 D['triangulated']['edges'], 
-                                T, lambda_,k=np.pi/(180.0))
+                                T, lambda_,k=np.pi/(180.0),
+                                normalized=normalized)
     if verbose:
         print("The computed simplicial flat norm is:",norm)
     
@@ -148,18 +151,22 @@ for eps in np.linspace(5e-4,2e-3,16):
     for lamb in np.linspace(1000,100000,10):
         n,n1,n2 = compute_flatnorm_region(point_list[2],actgeom,syngeom,
                                           epsilon=eps, lambda_=lamb,
-                                          plot=False)
-        plot_data['epsilon'].append(eps)
+                                          plot=False, normalized=True)
+        plot_data['epsilon'].append("%0.4f"%(eps))
         plot_data['lambda'].append(lamb)
         plot_data['flatnorm'].append(n)
         plot_data['norm_length'].append(n1)
         plot_data['norm_area'].append(n2)
 
+#%% Plot the results
+colors = sns.color_palette(n_colors=16)
 df = pd.DataFrame(plot_data)
 fig = plt.figure(figsize=(10,10))
 ax = fig.add_subplot(111)
 ax = sns.lineplot(data=df, x='lambda', y='flatnorm', hue='epsilon', ax=ax,
-                  markers = 'o',color=sns.color_palette("Set3"))
+                  markers = 'o',palette=sns.color_palette("mako_r", 16))
+ax.set_xlabel(r"Scale ($\lambda$) for multi-scale flat norm", fontsize=20)
+ax.set_ylabel(r"Normalized multi-scale flat norm", fontsize=20)
 
 #%% Compute flat norm for a region
 

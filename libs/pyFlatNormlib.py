@@ -147,7 +147,7 @@ def perform_triangulation(act_geom,syn_geom,adj=1,verbose=False):
 
 #%% flat norm computation
 def msfn(points, simplices, subsimplices, input_current, lambda_, 
-         w=[], v=[], cons=[],k=1):
+         w=[], v=[], cons=[], k=1, normalized=False):
     '''
     MSFN - Multiscale flat norm
     Accepts simplicial settings, an input current, multiscale factor(:math:`\lambda`).
@@ -183,6 +183,11 @@ def msfn(points, simplices, subsimplices, input_current, lambda_,
     sol, norm = lp_solver(c, cons, input_current)
     x = (sol[0:m_subsimplices] - sol[m_subsimplices:2*m_subsimplices]).reshape((1,m_subsimplices)).astype(int)
     s = (sol[2*m_subsimplices:2*m_subsimplices+n_simplices] - sol[2*m_subsimplices+n_simplices:]).reshape(1, n_simplices).astype(int)
+    
+    # Normalize by total length of current
+    den = np.dot(abs(input_current),abs(w))
+    if normalized:
+        norm = norm/den
     
     # Compute the two parts of the norm
     norm_subsimplices = np.dot(abs(x),abs(w))[0]
