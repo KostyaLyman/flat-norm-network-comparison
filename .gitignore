@@ -2,3 +2,6 @@ temp
 libs/__pycache__
 figs/extra
 trials
+env
+env_x86
+*.iml
