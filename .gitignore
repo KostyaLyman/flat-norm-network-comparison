@@ -5,3 +5,4 @@ trials
 env
 env_x86
 *.iml
+.idea
