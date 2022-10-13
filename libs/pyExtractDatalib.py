@@ -16,7 +16,7 @@ import geopandas as gpd
 import networkx as nx
 from shapely.geometry import LineString,Point
 from collections import namedtuple as nt
-from pyGeometrylib import Link
+from libs.pyGeometrylib import Link
 
 
 
@@ -39,7 +39,7 @@ def GetHomes(path,fis):
 
 
 #%% Get output synthetic networks (output of Step 2)
-def GetDistNet(path,code):
+def GetDistNet(path, code):
     """
     Read the txt file containing the edgelist of the generated synthetic network and
     generates the corresponding networkx graph. The graph has the necessary node and
@@ -64,13 +64,16 @@ def GetDistNet(path,code):
             geo_length: length of edge in meters
             flow: power flowing in kVA through edge
     """
+    path = path[:-1] if path[-1] == "/" else path
     if type(code) == list:
         graph = nx.Graph()
         for c in code:
-            g = nx.read_gpickle(path+str(c)+'-dist-net.gpickle')
-            graph = nx.compose(graph,g)
+            # g = nx.read_gpickle(path+str(c)+'-dist-net.gpickle')
+            g = nx.read_gpickle(f"{path}/{c}-dist-net.gpickle")
+            graph = nx.compose(graph, g)
     else:
-        graph = nx.read_gpickle(path+str(code)+'-dist-net.gpickle')
+        # graph = nx.read_gpickle(path+str(code)+'-dist-net.gpickle')
+        graph = nx.read_gpickle(f"{path}/{code}-dist-net.gpickle")
     return graph
 
 
