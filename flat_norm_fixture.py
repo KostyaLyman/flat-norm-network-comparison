@@ -522,7 +522,7 @@ class FlatNormRuns(FlatNormFixture):
             act_geom, synt_geom, region_list, area,
             region_highlight=region,
             file_name_sfx=f"_region_{region}",
-            do_return=False,
+            do_return=False, show=True,
             figsize=(40, 60)
         )
 
@@ -581,7 +581,8 @@ class FlatNormRuns(FlatNormFixture):
             region_list[region], act_geom, synt_geom,
             lambda_=lambda_,
             normalized=True,
-            plot=True
+            plot=True,
+            old_impl=True
         )
         self.assertIsNotNone(norm)
         self.assertIsNotNone(enorm)
@@ -750,7 +751,6 @@ class FlatNormRuns(FlatNormFixture):
         area = 'mcbryde'
         epsilons, lambdas = np.linspace(5e-4, 2e-3, 4), np.linspace(1000, 100000, 5)
         num_regions = 50
-        # region = 2
 
         # read geometries
         act_geom, synt_geom, hull = self.read_networks(area)
