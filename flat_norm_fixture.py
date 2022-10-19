@@ -1007,5 +1007,241 @@ class FlatNormMcbrydeRuns(FlatNormFixture):
             flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
         pass
 
+
+class FlatNormHethwoodRuns(FlatNormFixture):
+
+    def __init__(self, methodName: str = ...) -> None:
+        super().__init__(methodName)
+        self.seed = 54321
+        self.fig_dir = "figs/test"
+        self.area = 'hethwood'
+        pass
+
+    def test_hethwood_sample_regions_geom(self):
+        epsilon = 2e-3
+        num_regions = 6
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks(self.area)
+        self.assertIsNotNone(act_geom)
+        self.assertIsNotNone(synt_geom)
+        self.assertIsNotNone(hull)
+
+        # sample regions
+        point_list, region_list = self.sample_regions_geom(
+            hull, act_geom, synt_geom,
+            num_regions=num_regions, epsilon=epsilon, seed=self.seed
+        )
+        self.assertIsNotNone(region_list)
+
+        # plot regions
+        self.fig_dir = "figs/test"
+        fig, ax = self.plot_regions_list(
+            act_geom, synt_geom, region_list, self.area,
+            do_return=True, show=True,
+            file_name_sfx="sample_geom",
+            figsize=(20, 30), constained_layout=True
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+        pass
+
+    def test_hethwood_compute_and_plot_city_flatnorm(self):
+        lambda_ = 1000
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks(self.area)
+
+        # city region
+        city_bounds = hull.exterior.bounds
+        city_region = sg.box(*city_bounds)
+        city_width, city_height = city_bounds[MAX_X] - city_bounds[MIN_X], city_bounds[MAX_Y] - city_bounds[MIN_Y]
+        epsilon = max(city_width/2, city_height/2)
+
+        # plot city region
+        self.fig_dir = "figs/test"
+        self.plot_regions_list(
+            act_geom, synt_geom, [city_region], self.area,
+            file_name_sfx=f"city",
+            title_sfx=f"$\\epsilon={epsilon:0.4f}$",
+            do_return=False, show=True,
+            figsize=(20, 20), constained_layout=True
+        )
+
+        # city flat norm
+        norm, enorm, tnorm, w, plot_data = self.compute_region_flatnorm(
+            city_region, act_geom, synt_geom,
+            lambda_=lambda_,
+            normalized=True,
+            plot=True,
+            verbose=True,
+            adj=10000
+        )
+        self.assertIsNotNone(norm)
+        self.assertIsNotNone(enorm)
+        self.assertIsNotNone(tnorm)
+        self.assertIsNotNone(w)
+        self.assertIsNotNone(plot_data)
+
+        # plot city flat norm
+        fig, ax = self.plot_triangulated_region_flatnorm(
+            epsilon=epsilon, lambda_=lambda_,
+            to_file=f"{self.area}-flatnorm_city",
+            suptitle_sfx=f"$F_{{\\lambda}}$={norm:0.5f} : "
+                         f"|T| = {w:0.5f} : "
+                         f"|T| / $\\epsilon$ = {w / epsilon:0.5f}",
+            do_return=True,
+            constrained_layout=True,
+            **plot_data
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+
+        pass
+
+
+    def test_hethwood_plot_city_flatnorm_lines_and_stats(self):
+        lambdas = np.linspace(1000, 100000, 5)
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks(self.area)
+
+        # city region
+        city_bounds = hull.exterior.bounds
+        city_region = sg.box(*city_bounds)
+        city_width, city_height = city_bounds[MAX_X] - city_bounds[MIN_X], city_bounds[MAX_Y] - city_bounds[MIN_Y]
+        epsilon = max(city_width / 2, city_height / 2)
+
+        # compute city flat norm
+        flatnorm_data = {
+            'epsilons': [], 'lambdas': [], 'flatnorms': [],
+            'norm_lengths': [], 'norm_areas': [],
+            'input_lengths': [], 'input_ratios': [],
+        }
+
+        start_global = timer()
+        for l, lambda_ in enumerate(lambdas, start=1):
+            print(f"### LAMBDA[{l}] = {lambda_:0.5f} ###")
+            start = timer()
+            norm, enorm, tnorm, w = self.compute_region_flatnorm(
+                city_region,
+                act_geom, synt_geom,
+                lambda_=lambda_,
+                normalized=True,
+                plot=False
+            )
+            flatnorm_data['epsilons'].append(f"{epsilon:0.4f}")
+            flatnorm_data['lambdas'].append(lambda_)
+            flatnorm_data['flatnorms'].append(norm)
+            flatnorm_data['norm_lengths'].append(enorm)
+            flatnorm_data['norm_areas'].append(tnorm)
+            flatnorm_data['input_lengths'].append(w)
+            flatnorm_data['input_ratios'].append(w / epsilon)
+
+            end = timer()
+            print(f">>> LAMBDA[{l}] >>> {timedelta(seconds=end - start)} \n")
+            pass
+
+        end_global = timer()
+
+        # plot flatnorm lines
+        fig, ax = self.plot_region_flatnorm_lines(
+            epsilons=flatnorm_data['epsilons'],
+            lambdas=flatnorm_data['lambdas'],
+            flatnorms=flatnorm_data['flatnorms'],
+            to_file=f"{self.area}-flatnorm-lines_city",
+            do_return=True
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+
+        print("--------------------------------------------------------------------------")
+        print(f"compute city flatnorm "
+              f"for {len(lambdas)} lambdas = {timedelta(seconds=end_global-start_global)}")
+        print("--------------------------------------------------------------------------")
+        flatnorm_data = pd.DataFrame(flatnorm_data)
+        pprint(flatnorm_data)
+
+        self.out_dir = "out/test"
+        file_name = f"{self.area}-flatnorm-stats_city"
+        import csv
+        with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
+            flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+        pass
+
+
+    def test_hethwood_flatnorm_stats(self):
+        epsilons, lambdas = np.linspace(5e-4, 2e-3, 4), np.linspace(1000, 100000, 5)
+        num_regions = 50
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks()
+
+        # sample points
+        flatnorm_data = {
+            'epsilons': [], 'lambdas': [], 'flatnorms': [],
+            'norm_lengths': [], 'norm_areas': [],
+            'input_lengths': [], 'input_ratios': [],
+            'MIN_X': [], 'MIN_Y': [], 'MAX_X': [], 'MAX_Y': [],
+        }
+        np.random.seed(self.seed)
+        start_global = timer()
+        for e, epsilon in enumerate(epsilons, start=1):
+            for l, lambda_ in enumerate(lambdas, start=1):
+                print(f"### EPS[{e}] = {epsilon:0.5f} ###### LAMBDA[{l}] = {lambda_:0.5f} ###")
+                points = self.random_points_geom(
+                    hull, act_geom, synt_geom,
+                    epsilon=epsilons[0],
+                    num_points=num_regions,
+                )
+                start = timer()
+                for pt in points:
+                    region = self.get_region(pt, epsilon)
+                    region_bounds = region.exterior.bounds
+                    norm, enorm, tnorm, w = self.compute_region_flatnorm(
+                        region,
+                        act_geom, synt_geom,
+                        lambda_=lambda_,
+                        normalized=True,
+                        plot=False,
+                        
+                    )
+                    flatnorm_data['epsilons'].append(f"{epsilon:0.4f}")
+                    flatnorm_data['lambdas'].append(lambda_)
+                    flatnorm_data['flatnorms'].append(norm)
+                    flatnorm_data['norm_lengths'].append(enorm)
+                    flatnorm_data['norm_areas'].append(tnorm)
+                    flatnorm_data['input_lengths'].append(w)
+                    flatnorm_data['input_ratios'].append(w/epsilon)
+                    flatnorm_data['MIN_X'].append(region_bounds[MIN_X])
+                    flatnorm_data['MIN_Y'].append(region_bounds[MIN_Y])
+                    flatnorm_data['MAX_X'].append(region_bounds[MAX_X])
+                    flatnorm_data['MAX_Y'].append(region_bounds[MAX_Y])
+                    pass
+
+                end = timer()
+                print(f">>> EPS[{e}] : LAMBDA[{l}] >>> {timedelta(seconds=end - start)} \n")
+
+
+        end_global = timer()
+
+        flatnorm_data = pd.DataFrame(flatnorm_data)
+
+        print("--------------------------------------------------------------------------")
+        print(
+            f"compute flatnorm for {num_regions} regions"
+            f"for {len(epsilons)} epsilons "
+            f"and {len(lambdas)} lambdas = {timedelta(seconds=end_global - start_global)}")
+        print("--------------------------------------------------------------------------")
+        pprint(flatnorm_data)
+
+        self.out_dir = "out/test"
+        file_name = f"{self.area}-flatnorm-stats_{num_regions}_regions"
+        import csv
+        with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
+            flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+        pass
+
+
 if __name__ == '__main__':
     unittest.main()
