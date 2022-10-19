@@ -9,7 +9,8 @@ import sys, os
 import numpy as np
 
 import geopandas as gpd
-from shapely.geometry import Point, LineString, MultiLineString, base as sg
+from shapely.geometry import Point, LineString, MultiLineString
+import shapely.geometry as sg
 from matplotlib import pyplot as plt
 import matplotlib.axes
 import networkx as nx
@@ -22,11 +23,16 @@ from libs.pyDrawNetworklib import plot_norm, plot_intermediate_result, plot_inpu
 from libs.pyDrawNetworklib import plot_regions, plot_triangulation
 
 
-def get_fig_from_ax(ax, figsize, **kwargs):
+MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
+long_dashed = (5, (10, 3))
+
+def get_fig_from_ax(ax, **kwargs):
     if not ax:
         no_ax = True
         ndim = kwargs.get('ndim', (1, 1))
-        fig, ax = plt.subplots(*ndim, figsize=figsize)
+        figsize = kwargs.get('figsize', (10, 10))
+        constrained_layout = kwargs.get('constrained_layout', False)
+        fig, ax = plt.subplots(*ndim, figsize=figsize, constrained_layout=constrained_layout)
     else:
         no_ax = False
         if not isinstance(ax, matplotlib.axes.Axes):
@@ -102,7 +108,10 @@ class FlatNormFixture(unittest.TestCase):
                 output_geometry.append(geom)
         return output_geometry
 
-    def read_networks(self, area):
+    def read_networks(self, area=None):
+        if not area:
+            area = self.area
+
         # Actual network
         act_edges_file = f"{self.act_path}/{area}/{area}_edges.shp"
         if not os.path.exists(act_edges_file):
@@ -226,8 +235,12 @@ class FlatNormFixture(unittest.TestCase):
         return point_list, region_list
 
     def get_triangulated_currents(
-            self, region, act_geom, synt_geom, verbose=False,
+            self, region, act_geom, synt_geom, **kwargs
     ):
+        verbose = kwargs.get('verbose', False)
+        adj = kwargs.get('adj', 1000)
+        opts = kwargs.get('opts', "ps")
+
         # get the actual network edges in the region
         reg_act_geom = [g for g in act_geom if g.intersects(region)]
         reg_synt_geom = [g for g in synt_geom if g.intersects(region)]
@@ -243,7 +256,11 @@ class FlatNormFixture(unittest.TestCase):
             return dict(), np.array([]), np.array([])
 
         # Flat norm computation
-        D = perform_triangulation(sorted_act_geom, sorted_synt_geom, adj=1000)
+        D = perform_triangulation(
+            sorted_act_geom, sorted_synt_geom,
+            adj=adj, opts=opts,
+            verbose=verbose,
+        )
         if D['triangulated'] == None:
             _ = plot_failed_triangulation(D)
             sys.exit(0)
@@ -251,6 +268,9 @@ class FlatNormFixture(unittest.TestCase):
         # computing currents
         T1 = get_current(D['triangulated'], D['actual'])
         T2 = get_current(D['triangulated'], D['synthetic'])
+        if verbose:
+            print(f"Task completed: Actual[{abs(T1).sum()}] "
+                  f"and synthetic[{abs(T2).sum()}] currents created")
 
         return D, T1, T2
 
@@ -290,10 +310,18 @@ class FlatNormFixture(unittest.TestCase):
             self, region, act_geom, synt_geom,
             lambda_=1000,
             normalized=False,
-            verbose=False, plot=False, old_impl=False
+            **kwargs
+            # verbose=False, plot=False, old_impl=False
     ):
+        """
+        :returns:  flatnorm, enorm, tnorm, input_length, [plot_data if plot==True]
+        """
+        verbose = kwargs.setdefault('verbose', False)
+        plot = kwargs.get('plot', False)
+        old_impl = kwargs.get('old_impl', False)
+
         # compute triangulation and currents
-        D, T1, T2 = self.get_triangulated_currents(region, act_geom, synt_geom, verbose=verbose)
+        D, T1, T2 = self.get_triangulated_currents(region, act_geom, synt_geom, **kwargs)
         T = T1 - T2
 
         if not D or T1.size == 0 or T2.size == 0:
@@ -338,19 +366,26 @@ class FlatNormFixture(unittest.TestCase):
     def plot_regions_list(
             self,
             act_geom, synt_geom, regions_list, area=None,
-            region_highlight=None,
+            # region_highlight=None,
             ax=None, to_file=None, show=True,
             **kwargs
     ):
-        figsize = kwargs.get('figsize', (40, 60))
+        kwargs.setdefault('figsize', (40, 20))
+        fontsize = kwargs.get('fontsize', 20)
         do_return = kwargs.get('do_return', False)
+        if not area:
+            area = self.area
+        if not to_file:
+            to_file = f"{area}-regions"
 
         # ---- PLOT ----
-        fig, ax, no_ax = get_fig_from_ax(ax, figsize)
-        plot_regions(act_geom, synt_geom, regions_list, ax, region_highlight)
-        if area:
-            to_file = f"{area}-regions"
-            ax.set_title(f"[{area}]")
+        fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
+        plot_regions(act_geom, synt_geom, regions_list, ax, **kwargs)
+
+        title = f"[{area}]"
+        if kwargs.get('title_sfx'):
+            title = f"{title} : {kwargs.get('title_sfx')}"
+        ax.set_title(title, fontsize=fontsize)
 
         if kwargs.get('file_name_sfx'):
             to_file = f"{to_file}_{kwargs.get('file_name_sfx')}"
@@ -361,7 +396,7 @@ class FlatNormFixture(unittest.TestCase):
             if kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} : {kwargs.get('suptitle_sfx')}"
 
-            fig.suptitle(suptitle)
+            fig.suptitle(suptitle, fontsize=fontsize+3)
             close_fig(fig, to_file, show)
 
         if do_return:
@@ -372,21 +407,28 @@ class FlatNormFixture(unittest.TestCase):
             self, triangulated, T1, T2,
             echain, tchain,
             epsilon, lambda_,
+            fnorm=None, fnorm_only=False,
             ax=None, to_file=None, show=True,
             **kwargs
     ):
-        figsize = kwargs.get('figsize', (20, 10))
+        kwargs.setdefault('figsize', (20, 10))
         fontsize = kwargs.get('fontsize', 20)
         do_return = kwargs.get('do_return', False)
 
         # ---- PLOT ----
-        fig, axs, no_ax = get_fig_from_ax(ax, figsize, ndim=(1, 2))
+        fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
+        fnorm_title = f"Flat norm scale, $\\lambda$ = {lambda_:d}" if not fnorm \
+            else f"$\\lambda = {lambda_:d}$, $F_{{\\lambda}}={fnorm:0.3f}$"
 
-        plot_triangulation(triangulated, T1, T2, axs[0])
-        axs[0].set_title(f"Radius of region = {epsilon}", fontsize=fontsize)
+        if not fnorm_only:
+            plot_triangulation(triangulated, T1, T2, axs[0])
+            axs[0].set_title(f"Radius of region = {epsilon}", fontsize=fontsize)
 
-        plot_norm(triangulated, echain, tchain, axs[1])
-        axs[1].set_title(f"Flat norm scale, $\\lambda$ = {lambda_:d}", fontsize=fontsize)
+            plot_norm(triangulated, echain, tchain, axs[1])
+            axs[1].set_title(fnorm_title, fontsize=fontsize)
+        else:
+            plot_norm(triangulated, echain, tchain, axs)
+            axs.set_title(fnorm_title, fontsize=fontsize)
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
@@ -394,7 +436,7 @@ class FlatNormFixture(unittest.TestCase):
             if kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} : {kwargs.get('suptitle_sfx')}"
 
-            fig.suptitle(suptitle)
+            fig.suptitle(suptitle, fontsize=fontsize + 3)
             close_fig(fig, to_file, show, bbox_inches='tight')
 
         if do_return:
@@ -406,13 +448,12 @@ class FlatNormFixture(unittest.TestCase):
             ax=None, to_file=None, show=True,
             **kwargs
     ):
-        figsize = kwargs.get('figsize', (10, 10))
+        kwargs.setdefault('figsize', (10, 10))
         fontsize = kwargs.get('fontsize', 20)
         do_return = kwargs.get('do_return', False)
 
         # ---- PLOT ----
-        fig, ax, no_ax = get_fig_from_ax(ax, figsize)
-        # colors = sns.color_palette(n_colors=16)
+        fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
         ax = sns.lineplot(
             # data=plot_data_df,
             x=lambdas, y=flatnorms, hue=epsilons, ax=ax,
@@ -427,7 +468,7 @@ class FlatNormFixture(unittest.TestCase):
             suptitle = f"{to_file}"
             if kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} :  {kwargs.get('suptitle_sfx')};"
-            fig.suptitle(suptitle)
+            fig.suptitle(suptitle, fontsize=fontsize + 3)
             close_fig(fig, to_file, show, bbox_inches='tight')
 
         if do_return:
@@ -435,20 +476,22 @@ class FlatNormFixture(unittest.TestCase):
         pass
 
 
-class FlatNormRuns(FlatNormFixture):
+class FlatNormMcbrydeRuns(FlatNormFixture):
 
     def __init__(self, methodName: str = ...) -> None:
         super().__init__(methodName)
         self.seed = 54321
+        self.fig_dir = "figs/test"
+        self.area = 'mcbryde'
         pass
 
     def test_sample_regions(self):
-        area = 'mcbryde'
+        self.area = 'mcbryde'
         epsilon = 2e-3
         num_regions = 6
 
         # read geometries
-        act_geom, synt_geom, hull = self.read_networks(area)
+        act_geom, synt_geom, hull = self.read_networks(self.area)
         self.assertIsNotNone(act_geom)
         self.assertIsNotNone(synt_geom)
         self.assertIsNotNone(hull)
@@ -462,8 +505,37 @@ class FlatNormRuns(FlatNormFixture):
         # plot regions
         self.fig_dir = "figs/test"
         fig, ax = self.plot_regions_list(
-            act_geom, synt_geom, region_list, area,
+            act_geom, synt_geom, region_list, self.area,
             do_return=True
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+        pass
+
+    def test_sample_regions_geom(self):
+        self.area = 'mcbryde'
+        epsilon = 2e-3
+        num_regions = 6
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks(self.area)
+        self.assertIsNotNone(act_geom)
+        self.assertIsNotNone(synt_geom)
+        self.assertIsNotNone(hull)
+
+        # sample regions
+        point_list, region_list = self.sample_regions_geom(
+            hull, act_geom, synt_geom,
+            num_regions=num_regions, epsilon=epsilon, seed=self.seed
+        )
+        self.assertIsNotNone(region_list)
+
+        # plot regions
+        self.fig_dir = "figs/test"
+        fig, ax = self.plot_regions_list(
+            act_geom, synt_geom, region_list, self.area,
+            do_return=True, show=True,
+            file_name_sfx="sample_geom"
         )
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
@@ -502,64 +574,14 @@ class FlatNormRuns(FlatNormFixture):
 
         pass
 
-    def test_compute_and_plot_region_flatnorm(self):
-        area = 'mcbryde'
-        epsilon, lambda_ = 2e-3, 1000
-        num_regions = 6
-        region = 2
-
-        # read geometries
-        act_geom, synt_geom, hull = self.read_networks(area)
-
-        # sample regions
-        point_list, region_list = self.sample_regions(
-            hull, num_regions=num_regions, epsilon=epsilon, seed=self.seed
-        )
-
-        # plot regions
-        self.fig_dir = "figs/test"
-        self.plot_regions_list(
-            act_geom, synt_geom, region_list, area,
-            region_highlight=region,
-            file_name_sfx=f"_region_{region}",
-            do_return=False, show=True,
-            figsize=(40, 60)
-        )
-
-        # flat norm
-        norm, enorm, tnorm, w, plot_data = self.compute_region_flatnorm(
-            region_list[region], act_geom, synt_geom,
-            lambda_=lambda_,
-            normalized=True,
-            plot=True
-        )
-        self.assertIsNotNone(norm)
-        self.assertIsNotNone(enorm)
-        self.assertIsNotNone(tnorm)
-        self.assertIsNotNone(w)
-        self.assertIsNotNone(plot_data)
-
-        # plot flat norm
-        fig, ax = self.plot_triangulated_region_flatnorm(
-            epsilon=epsilon, lambda_=lambda_,
-            to_file=f"{area}-flatnorm_region_{region}",
-            suptitle_sfx=f"FN={norm:0.5f} : |T| = {w:0.5f} : |T| / $\\epsilon$ = {w / epsilon:0.5f}",
-            do_return=True,
-            **plot_data
-        )
-        self.assertIsNotNone(fig)
-        self.assertIsNotNone(ax)
-
-        pass
-
     def test_compute_and_plot_region_flatnorm_old_impl(self):
-        area = 'mcbryde'
+        self.area = 'mcbryde'
         epsilon, lambda_ = 2e-3, 1000
         num_regions = 6
         region = 2
 
         # read geometries
-        act_geom, synt_geom, hull = self.read_networks(area)
+        act_geom, synt_geom, hull = self.read_networks(self.area)
 
         # sample regions
         point_list, region_list = self.sample_regions(
@@ -569,14 +591,14 @@ class FlatNormRuns(FlatNormFixture):
         # plot regions
         self.fig_dir = "figs/test"
         self.plot_regions_list(
-            act_geom, synt_geom, region_list, area,
+            act_geom, synt_geom, region_list, self.area,
             region_highlight=region,
             file_name_sfx=f"_region_{region}",
             do_return=False,
             figsize=(40, 60)
         )
 
-        # flat norm
+        # flat norm (old_impl)
         norm, enorm, tnorm, w, plot_data = self.compute_region_flatnorm(
             region_list[region], act_geom, synt_geom,
             lambda_=lambda_,
@@ -593,7 +615,7 @@ class FlatNormRuns(FlatNormFixture):
         # plot flat norm
         fig, ax = self.plot_triangulated_region_flatnorm(
             epsilon=epsilon, lambda_=lambda_,
-            to_file=f"{area}-flatnorm_region_{region}_old_impl",
+            to_file=f"{self.area}-flatnorm_region_{region}_old_impl",
             suptitle_sfx=f"OLD_IMPL : FN={norm:0.5f} : |T| = {w:0.5f} : |T| / $\\epsilon$ = {w / epsilon:0.5f}",
             do_return=True,
             **plot_data
@@ -603,15 +625,66 @@ class FlatNormRuns(FlatNormFixture):
 
         pass
 
+    def test_compute_and_plot_region_flatnorm(self):
+        self.area = 'mcbryde'
+        epsilon, lambda_ = 2e-3, 1000
+        num_regions = 6
+        region = 2
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks(self.area)
+
+        # sample regions
+        point_list, region_list = self.sample_regions(
+            hull, num_regions=num_regions, epsilon=epsilon, seed=self.seed
+        )
+
+        # plot regions
+        self.fig_dir = "figs/test"
+        self.plot_regions_list(
+            act_geom, synt_geom, region_list, self.area,
+            region_highlight=region,
+            file_name_sfx=f"_region_{region}",
+            do_return=False, show=True,
+            figsize=(40, 60)
+        )
+
+        # flat norm
+        norm, enorm, tnorm, w, plot_data = self.compute_region_flatnorm(
+            region_list[region], act_geom, synt_geom,
+            lambda_=lambda_,
+            normalized=True,
+            plot=True,
+            opts="psVe",
+        )
+        self.assertIsNotNone(norm)
+        self.assertIsNotNone(enorm)
+        self.assertIsNotNone(tnorm)
+        self.assertIsNotNone(w)
+        self.assertIsNotNone(plot_data)
+
+        # plot flat norm
+        fig, ax = self.plot_triangulated_region_flatnorm(
+            epsilon=epsilon, lambda_=lambda_,
+            to_file=f"{self.area}-flatnorm_region_{region}",
+            suptitle_sfx=f"FN={norm:0.5f} : |T| = {w:0.5f} : |T| / $\\epsilon$ = {w / epsilon:0.5f}",
+            do_return=True,
+            **plot_data
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+
+        pass
+
     def test_compute_and_plot_region_flatnorm_timed(self):
-        area = 'mcbryde'
+        self.area = 'mcbryde'
         epsilon, lambda_ = 2e-3, 1000
         num_regions = 6
         region = 2
 
         # read geometries
         (act_geom, synt_geom, hull), t_geom = timeit(
-            self.read_networks, area
+            self.read_networks, self.area
         )
 
         # sample regions
@@ -624,7 +697,7 @@ class FlatNormRuns(FlatNormFixture):
         self.fig_dir = "figs/test"
         _, t_regions_plot = timeit(
             self.plot_regions_list,
-            act_geom, synt_geom, region_list, area,
+            act_geom, synt_geom, region_list, self.area,
             region_highlight=region,
             file_name_sfx=f"region_{region}",
             do_return=False,
@@ -651,7 +724,7 @@ class FlatNormRuns(FlatNormFixture):
         (fig, ax), t_flatnorm_plot = timeit(
             self.plot_triangulated_region_flatnorm,
             epsilon=epsilon, lambda_=lambda_,
-            to_file=f"{area}-flatnorm_region_{region}",
+            to_file=f"{self.area}-flatnorm_region_{region}",
             suptitle_sfx=f"FN={norm:0.5f} : |T| = {w:0.5f} : |T| / $\\epsilon$ = {w / epsilon:0.5f}",
             do_return=True,
             **plot_data
@@ -668,6 +741,59 @@ class FlatNormRuns(FlatNormFixture):
 
         pass
 
+    def test_compute_and_plot_city_flatnorm(self):
+        self.area = 'mcbryde'
+        lambda_ = 1000
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks(self.area)
+
+        # city region
+        city_bounds = hull.exterior.bounds
+        city_region = sg.box(*city_bounds)
+        city_width, city_height = city_bounds[MAX_X] - city_bounds[MIN_X], city_bounds[MAX_Y] - city_bounds[MIN_Y]
+        epsilon = max(city_width/2, city_height/2)
+
+        # plot city region
+        self.fig_dir = "figs/test"
+        self.plot_regions_list(
+            act_geom, synt_geom, [city_region], self.area,
+            file_name_sfx=f"city",
+            do_return=False, show=True,
+            figsize=(40, 20)
+        )
+
+        # city flat norm
+        norm, enorm, tnorm, w, plot_data = self.compute_region_flatnorm(
+            city_region, act_geom, synt_geom,
+            lambda_=lambda_,
+            normalized=True,
+            plot=True,
+            verbose=True,
+            opts="psVe"
+        )
+        self.assertIsNotNone(norm)
+        self.assertIsNotNone(enorm)
+        self.assertIsNotNone(tnorm)
+        self.assertIsNotNone(w)
+        self.assertIsNotNone(plot_data)
+
+        # plot city flat norm
+        fig, ax = self.plot_triangulated_region_flatnorm(
+            epsilon=f"{epsilon:0.4f}", lambda_=lambda_,
+            to_file=f"{self.area}-flatnorm_city",
+            suptitle_sfx=f"$F_{{\\lambda}}$={norm:0.5f} : "
+                         f"|T| = {w:0.5f} : "
+                         f"|T| / $\\epsilon$ = {w / epsilon:0.5f}",
+            do_return=True,
+            constrained_layout=True,
+            **plot_data
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+
+        pass
+
     def test_plot_region_flatnorm_lines(self):
         area = 'mcbryde'
         # epsilons, lambdas = np.linspace(1e-3, 2e-3, 4), np.linspace(1000, 100000, 5)
@@ -679,14 +805,6 @@ class FlatNormRuns(FlatNormFixture):
         act_geom, synt_geom, hull = self.read_networks(area)
 
         # sample points
-        # points, regions = self.sample_regions(
-        #     hull, num_regions=num_regions, epsilon=epsilons[-1], seed=self.seed
-        # )
-        # points, regions = self.sample_regions_buffered(
-        #     hull, num_regions=num_regions,
-        #     epsilon=epsilons[0], tollerance=0.9,
-        #     seed=12345
-        # )
         points, regions = self.sample_regions_geom(
             hull, act_geom, synt_geom,
             epsilon=epsilons[0],
@@ -746,6 +864,76 @@ class FlatNormRuns(FlatNormFixture):
         pprint(pd.DataFrame(flatnorm_data))
         pass
 
+    def test_plot_city_flatnorm_lines_and_stats(self):
+        self.area = 'mcbryde'
+        lambdas = np.linspace(1000, 100000, 5)
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks(self.area)
+
+        # city region
+        city_bounds = hull.exterior.bounds
+        city_region = sg.box(*city_bounds)
+        city_width, city_height = city_bounds[MAX_X] - city_bounds[MIN_X], city_bounds[MAX_Y] - city_bounds[MIN_Y]
+        epsilon = max(city_width / 2, city_height / 2)
+
+        # compute city flat norm
+        flatnorm_data = {
+            'epsilons': [], 'lambdas': [], 'flatnorms': [],
+            'norm_lengths': [], 'norm_areas': [],
+            'input_lengths': [], 'input_ratios': [],
+        }
+
+        start_global = timer()
+        for l, lambda_ in enumerate(lambdas, start=1):
+            print(f"### LAMBDA[{l}] = {lambda_:0.5f} ###")
+            start = timer()
+            norm, enorm, tnorm, w = self.compute_region_flatnorm(
+                city_region,
+                act_geom, synt_geom,
+                lambda_=lambda_,
+                normalized=True,
+                plot=False
+            )
+            flatnorm_data['epsilons'].append(f"{epsilon:0.4f}")
+            flatnorm_data['lambdas'].append(lambda_)
+            flatnorm_data['flatnorms'].append(norm)
+            flatnorm_data['norm_lengths'].append(enorm)
+            flatnorm_data['norm_areas'].append(tnorm)
+            flatnorm_data['input_lengths'].append(w)
+            flatnorm_data['input_ratios'].append(w / epsilon)
+
+            end = timer()
+            print(f">>> LAMBDA[{l}] >>> {timedelta(seconds=end - start)} \n")
+            pass
+
+        end_global = timer()
+
+        # plot flatnorm lines
+        fig, ax = self.plot_region_flatnorm_lines(
+            epsilons=flatnorm_data['epsilons'],
+            lambdas=flatnorm_data['lambdas'],
+            flatnorms=flatnorm_data['flatnorms'],
+            to_file=f"{self.area}-flatnorm-lines_city",
+            do_return=True
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+
+        print("--------------------------------------------------------------------------")
+        print(f"compute city flatnorm "
+              f"for {len(lambdas)} lambdas = {timedelta(seconds=end_global-start_global)}")
+        print("--------------------------------------------------------------------------")
+        flatnorm_data = pd.DataFrame(flatnorm_data)
+        pprint(flatnorm_data)
+
+        self.out_dir = "out/test"
+        file_name = f"{self.area}-flatnorm-stats_city"
+        import csv
+        with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
+            flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+        pass
+
 
     def test_flatnorm_stats(self):
         area = 'mcbryde'
@@ -760,6 +948,7 @@ class FlatNormRuns(FlatNormFixture):
             'epsilons': [], 'lambdas': [], 'flatnorms': [],
             'norm_lengths': [], 'norm_areas': [],
             'input_lengths': [], 'input_ratios': [],
+            'MIN_X': [], 'MIN_Y': [], 'MAX_X': [], 'MAX_Y': [],
         }
         np.random.seed(self.seed)
         start_global = timer()
@@ -773,8 +962,10 @@ class FlatNormRuns(FlatNormFixture):
                 )
                 start = timer()
                 for pt in points:
+                    region = self.get_region(pt, epsilon)
+                    region_bounds = region.exterior.bounds
                     norm, enorm, tnorm, w = self.compute_region_flatnorm(
-                        self.get_region(pt, epsilon),
+                        region,
                         act_geom, synt_geom,
                         lambda_=lambda_,
                         normalized=True,
@@ -787,6 +978,10 @@ class FlatNormRuns(FlatNormFixture):
                     flatnorm_data['norm_areas'].append(tnorm)
                     flatnorm_data['input_lengths'].append(w)
                     flatnorm_data['input_ratios'].append(w/epsilon)
+                    flatnorm_data['MIN_X'].append(region_bounds[MIN_X])
+                    flatnorm_data['MIN_Y'].append(region_bounds[MIN_Y])
+                    flatnorm_data['MAX_X'].append(region_bounds[MAX_X])
+                    flatnorm_data['MAX_Y'].append(region_bounds[MAX_Y])
                     pass
 
                 end = timer()

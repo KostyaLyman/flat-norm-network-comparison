@@ -278,7 +278,14 @@ def plot_triangulation(tri_struct, t1, t2, ax):
     return ax
 
 
-def plot_regions(act_geom, syn_geom, geom_regions, ax, region_highlight=None):
+def plot_regions(act_geom, syn_geom, geom_regions, ax,  **kwargs):
+    highlight = kwargs.get('region_highlight', None)
+    highlight = kwargs.get('highlight', highlight)
+    plot_colors = dict(
+        region=kwargs.get('region_color', 'cyan'),
+        highlight=kwargs.get('highlight_color', 'orange')
+    )
+
     # Get the geometries
     geom1_vertices, geom1_segments = get_vertseg_geometry(act_geom)
     geom2_vertices, geom2_segments = get_vertseg_geometry(syn_geom)
@@ -290,12 +297,12 @@ def plot_regions(act_geom, syn_geom, geom_regions, ax, region_highlight=None):
     draw_lines(ax, geom2_segments, color='blue', width=2.0, style='solid', alpha=1.0,
                directed=False, label='Synthetic Network')
     # ax.legend(fontsize=20, markerscale=3)
-    if region_highlight is not None:
+    if highlight is not None:
         geom_regions = geom_regions[:]
-        region = geom_regions.pop(region_highlight)
-        draw_polygons(ax, [region], color='orange', alpha=0.2, label=None)
+        region = geom_regions.pop(highlight)
+        draw_polygons(ax, [region], color=plot_colors['highlight'], alpha=0.2, label=None)
 
-    draw_polygons(ax, geom_regions, color='cyan', alpha=0.2, label=None)
+    draw_polygons(ax, geom_regions, color=plot_colors['region'], alpha=0.2, label=None)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
     return ax
 
