@@ -350,7 +350,7 @@ class FlatNormFixture(unittest.TestCase):
         plot_regions(act_geom, synt_geom, regions_list, ax, region_highlight)
         if area:
             to_file = f"{area}-regions"
-            ax.set_title(f"[{area}]")
+            ax.set_title(f"Area Name: {area}", fontsize=50)
 
         if kwargs.get('file_name_sfx'):
             to_file = f"{to_file}_{kwargs.get('file_name_sfx')}"

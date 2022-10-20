@@ -235,8 +235,8 @@ def plot_intermediate_result(struct, ax):
                          for c in struct['segments']]
 
     # Plot 2: All segments and points in the pre-triangulated phase
-    draw_points(ax, geom_all_vertices, color='magenta', size=20, alpha=1.0, marker='o')
-    draw_lines(ax, geom_all_segments, color='magenta', width=1.0, style='solid', alpha=1.0,
+    draw_points(ax, geom_all_vertices, color='black', size=20, alpha=1.0, marker='o')
+    draw_lines(ax, geom_all_segments, color='black', width=1.0, style='solid', alpha=1.0,
                directed=False)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
     return ax
@@ -271,10 +271,11 @@ def plot_triangulation(tri_struct, t1, t2, ax):
     draw_lines(ax, geom_subsimplices, color='black', width=0.5, style='dashed',
                alpha=0.2, directed=False)
     draw_lines(ax, geom_segment1, color='red', width=2.0, style='solid',
-               alpha=1.0, directed=False)
+               alpha=1.0, directed=False,label='Actual network')
     draw_lines(ax, geom_segment2, color='blue', width=2.0, style='solid',
-               alpha=1.0, directed=False)
+               alpha=1.0, directed=False,label='Synthetic network')
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    ax.legend(fontsize=20, markerscale=2.5, loc="upper left")
     return ax
 
 
@@ -300,6 +301,26 @@ def plot_regions(act_geom, syn_geom, geom_regions, ax, region_highlight=None):
     return ax
 
 
+def plot_points(act_geom, syn_geom, geom_points, ax):
+    # Get the geometries
+    geom1_vertices, geom1_segments = get_vertseg_geometry(act_geom)
+    geom2_vertices, geom2_segments = get_vertseg_geometry(syn_geom)
+    
+    # Plot the geometries of the pair of networks
+    draw_points(ax, geom1_vertices, color='red', size=20, alpha=1.0, marker='o')
+    draw_lines(ax, geom1_segments, color='red', width=2.0, style='solid', alpha=1.0,
+               directed=False, label='Actual Network')
+    draw_points(ax, geom2_vertices, color='blue', size=20, alpha=1.0, marker='o')
+    draw_lines(ax, geom2_segments, color='blue', width=2.0, style='solid', alpha=1.0,
+               directed=False, label='Synthetic Network')
+    
+    # Plot the highlighted points
+    draw_points(ax, geom_points, color='orange', size=500, alpha=1.0, marker='D')
+    
+    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    return ax
+
+
 def plot_failed_triangulation(dict_struct):
     act_geom = dict_struct['actual']
     syn_geom = dict_struct['synthetic']
@@ -313,6 +334,47 @@ def plot_failed_triangulation(dict_struct):
     ax2 = fig.add_subplot(122)
     ax2 = plot_intermediate_result(struct, ax2)
     return fig
+
+def plot_hausdorff(tri_struct, t1, t2, geom_haus, ax):
+    geom_subsimplices = [LineString((tri_struct['vertices'][c[0]],
+                                     tri_struct['vertices'][c[1]])) \
+                         for c in tri_struct['edges']]
+
+    geom_segment1 = [geom_subsimplices[i] for i, t in enumerate(t1) if t != 0]
+    geom_segment2 = [geom_subsimplices[i] for i, t in enumerate(t2) if t != 0]
+
+    
+    draw_lines(ax, geom_segment1, color='red', width=1.0, style='solid',
+               alpha=0.5, directed=False)
+    draw_lines(ax, geom_segment2, color='blue', width=1.0, style='solid',
+               alpha=0.5, directed=False)
+    draw_lines(ax, geom_haus, color='green', width=2.5, style='solid',
+               alpha=1.0, directed=False)
+    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    return ax
+
+
+class PlotTest:
+    def __init__(self, act_geom, syn_geom):
+        self.geom1_verts, self.geom1_segs = get_vertseg_geometry(act_geom)
+        self.geom2_verts, self.geom2_segs = get_vertseg_geometry(syn_geom)
+        pass
+    
+    def plot_input(self,act_geom, syn_geom, ax):
+        # Plot the geometries of the pair of networks
+        draw_points(ax, self.geom1_verts, color='red', size=20, 
+                    alpha=1.0, marker='o')
+        draw_lines(ax, self.geom1_segs, color='red', width=2.0, 
+                   style='solid', alpha=1.0,
+                   directed=False, label='Actual Network')
+        draw_points(ax, self.geom2_verts, color='blue', size=20, 
+                    alpha=1.0, marker='o')
+        draw_lines(ax, self.geom2_segs, color='blue', width=2.0, 
+                   style='solid', alpha=1.0,
+                   directed=False, label='Synthetic Network')
+        ax.tick_params(left=False, bottom=False, 
+                       labelleft=False, labelbottom=False)
+        return ax
 
 
 # %% Single geometry
