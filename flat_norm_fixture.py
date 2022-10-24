@@ -36,8 +36,12 @@ def get_fig_from_ax(ax, **kwargs):
     else:
         no_ax = False
         if not isinstance(ax, matplotlib.axes.Axes):
-            getter = kwargs.get('ax_getter', lambda x: x[0])
-            ax = getter(ax)
+            if isinstance(ax, list):
+                getter = kwargs.get('ax_getter', lambda x: x[0])
+                ax = getter(ax)
+            if isinstance(ax, dict):
+                getter = kwargs.get('ax_getter', lambda x: next(iter(ax.values())))
+                ax = getter(ax)
         fig = ax.get_figure()
 
     return fig, ax, no_ax
@@ -307,7 +311,8 @@ class FlatNormFixture(unittest.TestCase):
     #     return norm, enorm, tnorm, w
 
     def compute_region_flatnorm(
-            self, region, act_geom, synt_geom,
+            self, region=None, act_geom=None, synt_geom=None,
+            D=None, T1=None, T2=None,
             lambda_=1000,
             normalized=False,
             **kwargs
@@ -321,7 +326,9 @@ class FlatNormFixture(unittest.TestCase):
         old_impl = kwargs.get('old_impl', False)
 
         # compute triangulation and currents
-        D, T1, T2 = self.get_triangulated_currents(region, act_geom, synt_geom, **kwargs)
+        # if not D or not T1 or not T2:
+        if not D:
+            D, T1, T2 = self.get_triangulated_currents(region, act_geom, synt_geom, **kwargs)
         T = T1 - T2
 
         if not D or T1.size == 0 or T2.size == 0:
@@ -418,7 +425,7 @@ class FlatNormFixture(unittest.TestCase):
         # ---- PLOT ----
         fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
         fnorm_title = f"Flat norm scale, $\\lambda$ = {lambda_:d}" if not fnorm \
-            else f"$\\lambda = {lambda_:d}$, $F_{{\\lambda}}={fnorm:0.3f}$"
+            else f"$\\lambda = {lambda_:d}$, $F_{{\\lambda}}={fnorm:0.3g}$"
 
         if not fnorm_only:
             plot_triangulation(triangulated, T1, T2, axs[0])
