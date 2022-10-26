@@ -281,6 +281,7 @@ def plot_triangulation(tri_struct, t1, t2, ax):
 def plot_regions(act_geom, syn_geom, geom_regions, ax,  **kwargs):
     highlight = kwargs.get('region_highlight', None)
     highlight = kwargs.get('highlight', highlight)
+    alpha = kwargs.get('region_alpha', 0.2)
     plot_colors = dict(
         region=kwargs.get('region_color', 'cyan'),
         highlight=kwargs.get('highlight_color', 'orange')
@@ -300,9 +301,13 @@ def plot_regions(act_geom, syn_geom, geom_regions, ax,  **kwargs):
     if highlight is not None:
         geom_regions = geom_regions[:]
         region = geom_regions.pop(highlight)
-        draw_polygons(ax, [region], color=plot_colors['highlight'], alpha=0.2, label=None)
+        draw_polygons(
+            ax, [region],
+            color=plot_colors['highlight'], alpha=alpha,
+            label=None
+        )
 
-    draw_polygons(ax, geom_regions, color=plot_colors['region'], alpha=0.2, label=None)
+    draw_polygons(ax, geom_regions, color=plot_colors['region'], alpha=alpha, label=None)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
     return ax
 
