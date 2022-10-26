@@ -1927,10 +1927,418 @@ class FlatNormRuns_Hethwood(FlatNormFixture):
         pprint(flatnorm_data)
 
         self.out_dir = "out/test"
-        file_name = f"{self.area}-flatnorm-stats_{num_regions}_regions"
+        file_name = f"{self.area}-FN_STAT_R{num_regions}"
         import csv
         with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
             flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+        pass
+
+
+class FlatNormRuns_PatrickHenry(FlatNormFixture):
+
+    def __init__(self, methodName: str = ...) -> None:
+        super().__init__(methodName)
+        self.seed = 1254321
+        self.fig_dir = "figs/test"
+        self.area = 'patrick_henry'
+        pass
+
+    def test_PH_sample_regions_geom(self):
+        epsilon = 2e-3
+        num_regions = 6
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks(self.area)
+        self.assertIsNotNone(act_geom)
+        self.assertIsNotNone(synt_geom)
+        self.assertIsNotNone(hull)
+
+        # sample regions
+        point_list, region_list = self.sample_regions_geom(
+            hull, act_geom, synt_geom,
+            num_regions=num_regions, epsilon=epsilon, seed=self.seed
+        )
+        self.assertIsNotNone(region_list)
+
+        # plot regions
+        self.fig_dir = "figs/test"
+        fig, ax = self.plot_regions_list(
+            act_geom, synt_geom, region_list, self.area,
+            do_return=True, show=True,
+            file_name_sfx="sample_geom",
+            figsize=(20, 30), constained_layout=True
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+        pass
+
+
+    def test_PH_STAT_plot_city_flatnorm_lines_and_stats(self):
+        self.area = 'patrick_henry'
+        # lambdas = np.linspace(1000, 100000, 5)
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks(self.area)
+
+        # city region
+        city_bounds = hull.exterior.bounds
+        city_region = sg.box(*city_bounds)
+        city_width, city_height = city_bounds[MAX_X] - city_bounds[MIN_X], city_bounds[MAX_Y] - city_bounds[MIN_Y]
+        epsilon = max(city_width / 2, city_height / 2)
+
+        # compute city flat norm
+        flatnorm_data = {
+            'epsilons': [], 'lambdas': [], 'flatnorms': [],
+            'norm_lengths': [], 'norm_areas': [],
+            'input_lengths': [], 'input_ratios': [],
+        }
+
+        start_global = timer()
+        for l, lambda_ in enumerate(lambdas, start=1):
+            print(f"### LAMBDA[{l}] = {lambda_:d} ###")
+            start = timer()
+            norm, enorm, tnorm, w = self.compute_region_flatnorm(
+                city_region,
+                act_geom, synt_geom,
+                lambda_=lambda_,
+                normalized=True,
+                plot=False
+            )
+            flatnorm_data['epsilons'].append(f"{epsilon:0.4f}")
+            flatnorm_data['lambdas'].append(lambda_)
+            flatnorm_data['flatnorms'].append(norm)
+            flatnorm_data['norm_lengths'].append(enorm)
+            flatnorm_data['norm_areas'].append(tnorm)
+            flatnorm_data['input_lengths'].append(w)
+            flatnorm_data['input_ratios'].append(w / epsilon)
+
+            end = timer()
+            print(f">>> LAMBDA[{l}] >>> {timedelta(seconds=end - start)} \n")
+            pass
+
+        end_global = timer()
+
+        # plot flatnorm lines
+        fig, ax = self.plot_region_flatnorm_lines(
+            epsilons=flatnorm_data['epsilons'],
+            lambdas=flatnorm_data['lambdas'],
+            flatnorms=flatnorm_data['flatnorms'],
+            to_file=f"{self.area}-flatnorm-lines_city-fixed_lambdas",
+            do_return=True
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+
+        print("--------------------------------------------------------------------------")
+        print(f"compute city flatnorm "
+              f"for {len(lambdas)} lambdas = {timedelta(seconds=end_global-start_global)}")
+        print("--------------------------------------------------------------------------")
+        flatnorm_data = pd.DataFrame(flatnorm_data)
+        pprint(flatnorm_data)
+
+        self.out_dir = "out/test"
+        file_name = f"{self.area}-FN_STAT_city-fixed_lambdas"
+        import csv
+        with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
+            flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+        pass
+
+
+    def test_PH_STAT_flatnorm_stats(self):
+        self.area = 'patrick_henry'
+        epsilons = np.linspace(5e-4, 2e-3, 4)
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks()
+
+        # sample points
+        flatnorm_data = {
+            'epsilons': [], 'lambdas': [], 'flatnorms': [],
+            'norm_lengths': [], 'norm_areas': [],
+            'input_lengths': [], 'input_ratios': [],
+            'MIN_X': [], 'MIN_Y': [], 'MAX_X': [], 'MAX_Y': [],
+        }
+        np.random.seed(self.seed)
+        start_global = timer()
+        for e, epsilon in enumerate(epsilons, start=1):
+            for l, lambda_ in enumerate(lambdas, start=1):
+                print(f"### EPS[{e}] = {epsilon:0.4g} ###### LAMBDA[{l}] = {lambda_:d} ###")
+                points = self.random_points_geom(
+                    hull, act_geom, synt_geom,
+                    epsilon=epsilons[0],
+                    num_points=num_regions,
+                )
+                start = timer()
+                for pt in points:
+                    region = self.get_region(pt, epsilon)
+                    region_bounds = region.exterior.bounds
+                    norm, enorm, tnorm, w = self.compute_region_flatnorm(
+                        region,
+                        act_geom, synt_geom,
+                        lambda_=lambda_,
+                        normalized=True,
+                        plot=False
+                    )
+                    flatnorm_data['epsilons'].append(f"{epsilon:0.4f}")
+                    flatnorm_data['lambdas'].append(lambda_)
+                    flatnorm_data['flatnorms'].append(norm)
+                    flatnorm_data['norm_lengths'].append(enorm)
+                    flatnorm_data['norm_areas'].append(tnorm)
+                    flatnorm_data['input_lengths'].append(w)
+                    flatnorm_data['input_ratios'].append(w/epsilon)
+                    flatnorm_data['MIN_X'].append(region_bounds[MIN_X])
+                    flatnorm_data['MIN_Y'].append(region_bounds[MIN_Y])
+                    flatnorm_data['MAX_X'].append(region_bounds[MAX_X])
+                    flatnorm_data['MAX_Y'].append(region_bounds[MAX_Y])
+                    pass
+
+                end = timer()
+                print(f">>> EPS[{e}] : LAMBDA[{l}] >>> {timedelta(seconds=end - start)} \n")
+
+
+        end_global = timer()
+
+        flatnorm_data = pd.DataFrame(flatnorm_data)
+
+        print("--------------------------------------------------------------------------")
+        print(
+            f"compute flatnorm for {num_regions} regions"
+            f"for {len(epsilons)} epsilons "
+            f"and {len(lambdas)} lambdas = {timedelta(seconds=end_global - start_global)}")
+        print("--------------------------------------------------------------------------")
+        pprint(flatnorm_data)
+
+        self.out_dir = "out/test"
+        file_name = f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas"
+        import csv
+        with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
+            flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+        pass
+
+
+    def test_PH_plot_city_flatnorm_lines(self):
+        self.area = 'patrick_henry'
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
+        )
+
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks()
+
+        # city region
+        city_bounds = hull.exterior.bounds
+        city_region = sg.box(*city_bounds)
+        city_width, city_height = city_bounds[MAX_X] - city_bounds[MIN_X], city_bounds[MAX_Y] - city_bounds[MIN_Y]
+        epsilon = max(city_width / 2, city_height / 2)
+
+        # plot city region
+        self.fig_dir = "figs/test/fixed_lambdas"
+        self.plot_regions_list(
+            act_geom, synt_geom, [city_region], self.area,
+            file_name_sfx=f"city",
+            do_return=False, show=True,
+            figsize=(40, 20)
+        )
+
+        fig, ax = self.plot_region_flatnorm_lines(
+            epsilons=fn_city_df['epsilons'],
+            lambdas=fn_city_df['lambdas'],
+            flatnorms=fn_city_df['flatnorms'],
+            to_file=f"{self.area}-FIXL-flatnorm_lines_city",
+            do_return=True
+        )
+        self.assertIsNotNone(fig)
+        self.assertIsNotNone(ax)
+
+        print("--------------------------------------------------------------------------")
+        print(f"plot [{self.area}]'s flatnorm lines "
+              f"for {len(lambdas)} lambdas")
+        print("--------------------------------------------------------------------------")
+        pass
+
+
+    def test_PH_plot_fn_stats_hists__by_lambda(self):
+        self.area = 'patrick_henry'
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
+        )
+
+        L = len(lambdas)
+        fig, axs = plt.subplots(1, L, figsize=(L * 10, 10), constrained_layout=True)
+
+        fn_means, fn_cities = list(), list()
+        for l, lambda_ in enumerate(lambdas):
+            fnm, fnc = self.plot_hist_fn(
+                flatnorm_df, fn_city_df, lambda_, ax=axs[l],
+                titles=['fn', 'city'],
+
+            )
+            fn_means.append(fnm)
+            fn_cities.append(fnc)
+            pass
+
+        fnm_mean, fnm_std = np.array(fn_means).mean(), np.array(fn_means).std()
+        fnc_mean, fnc_std = np.array(fn_cities).mean(), np.array(fn_cities).std()
+
+        # fnm_suptitle = f"${{\\sf mean}}({FNM})={fnm_mean:0.3g}, {{\\sf sd}}({FNM})={fnm_std:0.3g}$"
+        fnm_suptitle_short = f"${FNM}={fnm_mean:0.3g} \\pm {fnm_std:0.3g}$"
+        city_suptitle = f"${CITY(self.area)} : {FNC}={fnc_mean:0.3g} \\pm {fnc_std:0.3g}$"
+        fig.suptitle(f"{city_suptitle}\n{fnm_suptitle_short}", fontsize=25)
+
+        self.fig_dir = "figs/test/fixed_lambdas"
+        file_name = f"{self.area}-R{num_regions}-FIXL-flatnorm_hists_lambdas"
+        close_fig(fig, to_file=f"{self.fig_dir}/{file_name}.png", show=True)
+
+        pass
+
+    def test_PH_plot_fn_stats_hists__all(self):
+        self.area = 'patrick_henry'
+        epsilons = np.linspace(5e-4, 2e-3, 4)
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
+        )
+
+        L, E = len(lambdas), len(epsilons)
+        fig, axs = plt.subplots(E, L, figsize=(L * 10, E * 10), constrained_layout=True)
+
+        fn_means, fn_cities = list(), list()
+        for e, epsilon in enumerate(epsilons):
+            for l, lambda_ in enumerate(lambdas):
+                fnm, fnc = self.plot_hist_fn(
+                    flatnorm_df, fn_city_df, lambda_, epsilon=epsilon,
+                    ax=axs[e][l],
+                    titles=['fn', 'city'],
+                    title_style="el",
+                )
+                fn_means.append(fnm)
+                fn_cities.append(fnc)
+                pass
+
+        fnm_mean, fnm_std = np.array(fn_means).mean(), np.array(fn_means).std()
+        fnc_mean, fnc_std = np.array(fn_cities).mean(), np.array(fn_cities).std()
+
+        # fnm_suptitle = f"${{\\sf mean}}({FNM})={fnm_mean:0.3g}, {{\\sf sd}}({FNM})={fnm_std:0.3g}$"
+        fnm_suptitle_short = f"${FNM}={fnm_mean:0.3g} \\pm {fnm_std:0.3g}$"
+        city_suptitle = f"${CITY(self.area)} : {FNC}={fnc_mean:0.3g} \\pm {fnc_std:0.3g}$"
+        fig.suptitle(f"{city_suptitle}\n{fnm_suptitle_short}", fontsize=25)
+
+        self.fig_dir = "figs/test/fixed_lambdas"
+        file_name = f"{self.area}-R{num_regions}-FIXL-flatnorm_hists_all"
+        close_fig(fig, to_file=f"{self.fig_dir}/{file_name}.png", show=True)
+        pass
+
+    def test_PH_plot_fn_stats_vs_ratios__by_lambda(self):
+        self.area = 'patrick_henry'
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
+        )
+
+        # BY LAMBDAS
+        L = len(lambdas)
+        fig, axs = plt.subplots(1, L, figsize=(L * 10, 11), constrained_layout=True)
+        reg_coefs_dict = dict()
+
+        for l, lambda_ in enumerate(lambdas):
+            reg_coefs_dict[lambda_] = self.plot_fn_vs_ratio(
+                flatnorm_df, fn_city_df, lambda_,
+                ax=axs[l],
+                titles=['fn', 'beta', 'r2'],
+                y_label_rotation='horizontal',
+            )
+
+        reg_coefs_data = pd.DataFrame(reg_coefs_dict).transpose()
+        beta_mean, beta_std = reg_coefs_data['b'].mean(), reg_coefs_data['b'].std()
+
+        beta_suptitle = f"mean($\\hat{{\\beta}}$)={beta_mean:0.4g}, sd($\\hat{{\\beta}}$)={beta_std:0.4g}"
+        city_suptitle = f"${CITY(self.area)} : |T|/\\epsilon = {fn_city_df['input_ratios'].max():0.3g}$"
+        fig.suptitle(f"{city_suptitle}\n{beta_suptitle}", fontsize=25)
+
+        self.fig_dir = "figs/test/fixed_lambdas"
+        file_name = f"{self.area}-R{num_regions}-FIXL-flatnorm_vs_ratios_lambdas"
+        close_fig(fig, to_file=f"{self.fig_dir}/{file_name}.png", show=True)
+
+        # save reg_coefs_data
+        self.out_dir = "out/test"
+        file_name = f"{self.area}-FN_REG_R{num_regions}_by_lambdas-fixed_lambdas"
+        import csv
+        with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
+            reg_coefs_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+
+        pass
+
+    def test_PH_plot_fn_stats_vs_ratios__all(self):
+        self.area = 'patrick_henry'
+        epsilons = np.linspace(5e-4, 2e-3, 4)
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
+        )
+
+        L, E = len(lambdas), len(epsilons)
+        fig, axs = plt.subplots(E, L, figsize=(L * 10, E * 11), constrained_layout=True)
+        reg_coefs_dict = dict()
+        for e, epsilon in enumerate(epsilons):
+            for l, lambda_ in enumerate(lambdas):
+                reg_coefs_dict[(epsilon, lambda_)] = self.plot_fn_vs_ratio(
+                    flatnorm_df, fn_city_df, lambda_, epsilon=epsilon,
+                    ax=axs[e][l],
+                    titles=['fn', 'beta', 'r2'],
+                    title_style="el",
+                    y_label_rotation='horizontal',
+                )
+
+        reg_coefs_data = pd.DataFrame(reg_coefs_dict).transpose()
+        beta_mean, beta_std = reg_coefs_data['b'].mean(), reg_coefs_data['b'].std()
+
+        beta_suptitle = f"mean($\\hat{{\\beta}}$)={beta_mean:0.4g}, sd($\\hat{{\\beta}}$)={beta_std:0.4g}"
+        city_suptitle = f"${CITY(self.area)} : |T|/\\epsilon = {fn_city_df['input_ratios'].max():0.3g}$"
+        fig.suptitle(f"{city_suptitle}\n{beta_suptitle}", fontsize=25)
+
+        self.fig_dir = "figs/test/fixed_lambdas"
+        file_name = f"{self.area}-R{num_regions}-FIXL-flatnorm_vs_ratios_all"
+        # file_name = f"{self.area}-flatnorm-input-ratios_{num_regions}_regions"
+        close_fig(fig, to_file=f"{self.fig_dir}/{file_name}.png", show=True)
+
+        # save reg_coefs_data
+        self.out_dir = "out/test"
+        file_name = f"{self.area}-FN_REG_R{num_regions}_all-fixed_lambdas"
+        # file_name = f"{self.area}-FN_REG_R{num_regions}_all"
+        import csv
+        with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
+            reg_coefs_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+
         pass
 
 
