@@ -67,6 +67,8 @@ selected_regions_ids = fn_df_lambda \
     .sort_values(by='flatnorms', ascending=False)['id'] \
     .to_list()[:5]
 
+#%% Just plot the regions
+
 fx.plot_selected_regions(
     selected_regions_ids, flatnorm_df, fn_city_df, lambda_,
     axd=axd,

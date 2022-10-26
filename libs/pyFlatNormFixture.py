@@ -818,7 +818,8 @@ class FlatNormFixture(unittest.TestCase):
             title = title_styles['ll'].format(lambda_=lambda_)
 
         subtitle = ", ".join([titles[t_name] for t_name in which_titles])
-        title = f"{title}\n{subtitle}"
+        # title = f"{title}\n{subtitle}"
+        title = f"{subtitle}"
         ax.set_title(title, fontsize=kwargs.get('title_fontsize', 25))
 
         # plot config -------------------------------------------------------------
@@ -896,7 +897,7 @@ class FlatNormFixture(unittest.TestCase):
 
         # PLOT SELECTED REGIONS ---------------------------------------------------------
         if axfn or axtr:
-            which_titles = kwargs.get('region_titles', ['epsilon', 'ratio', 'fn'])
+            # which_titles = kwargs.get('region_titles', ['epsilon', 'ratio', 'fn'])
             for r, r_id in enumerate(region_ids):
                 # flat norm
                 epsilon, ratio, fnorm = fn_df.loc[r_id, ['epsilons', 'input_ratios', 'flatnorms']]
@@ -907,20 +908,21 @@ class FlatNormFixture(unittest.TestCase):
                     'ratio': f"$|T|/\\epsilon = {ratio:0.3g}$",
                     'fn': f"${FNN}={fnorm:0.3g}$",
                 }
-                title = ", ".join([titles[t_name] for t_name in which_titles])
 
                 D, T1, T2 = self.get_triangulated_currents(region, act_geom, synt_geom, opts="ps")
                 
                 if axtr and not axfn:
                     which_titles = kwargs.get('region_titles', ['epsilon', 'ratio', 'fn'])
                     title = ", ".join([titles[t_name] for t_name in which_titles])
-                    plot_triangulation(D["triangulated"], T1, T2, axtr[r])
+                    plot_triangulation(D["triangulated"], T1, T2, axtr[r], 
+                                       region_bound = region)
                     axtr[r].set_title(title, fontsize=fontsize)
                 else:
                     if axtr:
                         which_titles = kwargs.get('region_titles', ['epsilon', 'ratio'])
                         title = ", ".join([titles[t_name] for t_name in which_titles])
-                        plot_triangulation(D["triangulated"], T1, T2, axtr[r])
+                        plot_triangulation(D["triangulated"], T1, T2, axtr[r], 
+                                           region_bound = region)
                         axtr[r].set_title(title, fontsize=fontsize)
     
                     if axfn:
@@ -932,7 +934,9 @@ class FlatNormFixture(unittest.TestCase):
                             normalized=True,
                             plot=True
                         )
-                        plot_norm(plot_data['triangulated'], plot_data['echain'], plot_data['tchain'], axfn[r])
+                        plot_norm(plot_data['triangulated'], plot_data['echain'], 
+                                  plot_data['tchain'], axfn[r],
+                                  region_bound = region)
                         axfn[r].set_title(title, fontsize=fontsize)
 
         return stats_data

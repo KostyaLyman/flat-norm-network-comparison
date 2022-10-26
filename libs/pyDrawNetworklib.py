@@ -202,7 +202,7 @@ def plot_result(dict_struct, t1, t2, s, x):
     return fig
 
 
-def plot_norm(tri_struct, x, s, ax):
+def plot_norm(tri_struct, x, s, ax, **kwargs):
     # Get triangles and edges from the dictionary
     vertices = tri_struct['vertices']
     triangles = tri_struct['triangles'][s[0] != 0]
@@ -224,6 +224,14 @@ def plot_norm(tri_struct, x, s, ax):
                directed=False)
     draw_polygons(ax, geom_triangles, color='magenta', alpha=0.2, label=None)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    
+    # ---- region of fixed size ----
+    region_bound = kwargs.get('region_bound', None)
+    if region_bound:
+        k = np.pi/180.0
+        xmin,xmax,ymin,ymax = region_bound.bounds
+        ax.set_xlim(xmin*k,xmax*k)
+        ax.set_ylim(ymin*k,ymax*k)
     return ax
 
 
@@ -258,7 +266,7 @@ def plot_input(act_geom, syn_geom, ax):
     return ax
 
 
-def plot_triangulation(tri_struct, t1, t2, ax):
+def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
     geom_vertices = [Point(v) for v in tri_struct['vertices'].tolist()]
     geom_subsimplices = [LineString((tri_struct['vertices'][c[0]],
                                      tri_struct['vertices'][c[1]])) \
@@ -275,7 +283,18 @@ def plot_triangulation(tri_struct, t1, t2, ax):
     draw_lines(ax, geom_segment2, color='blue', width=2.0, style='solid',
                alpha=1.0, directed=False,label='Synthetic network')
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
-    ax.legend(fontsize=20, markerscale=2.5, loc="upper left")
+    
+    # ---- region of fixed size ----
+    region_bound = kwargs.get('region_bound', None)
+    if region_bound:
+        xmin,xmax,ymin,ymax = region_bound.bounds
+        ax.set_xlim(xmin,xmax)
+        ax.set_ylim(ymin,ymax)
+    
+    # ---- legend for figure ----
+    legend = kwargs.get('legend', False)
+    if legend:
+        ax.legend(fontsize=20, markerscale=2.5, loc="upper left")
     return ax
 
 
@@ -297,7 +316,7 @@ def plot_regions(act_geom, syn_geom, geom_regions, ax,  **kwargs):
     draw_points(ax, geom2_vertices, color='blue', size=20, alpha=1.0, marker='o')
     draw_lines(ax, geom2_segments, color='blue', width=2.0, style='solid', alpha=1.0,
                directed=False, label='Synthetic Network')
-    # ax.legend(fontsize=20, markerscale=3)
+    ax.legend(fontsize=18, markerscale=2)
     if highlight is not None:
         geom_regions = geom_regions[:]
         region = geom_regions.pop(highlight)
