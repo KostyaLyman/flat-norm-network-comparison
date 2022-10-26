@@ -7,6 +7,7 @@ import warnings
 
 import sys, os
 import numpy as np
+import math
 
 import geopandas as gpd
 from shapely.geometry import Point, LineString, MultiLineString
@@ -25,6 +26,15 @@ from libs.pyDrawNetworklib import plot_regions, plot_triangulation
 
 MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 long_dashed = (5, (10, 3))
+
+FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
+# FNN = NORMALIZED_FLAT_NORM = "\\tilde{{\\mathbb{{F}}}}_{{\\lambda}}"
+FNN = NORMALIZED_FLAT_NORM = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}"
+FNNM = FNM = FLAT_NORM_MEAN = "\\widebar{{\\mathbb{{F}}}}_{{\\lambda}}"
+FNNC = FNC = FLAT_NORM_CITY = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}^{{\\  C}}"
+# CITY = lambda x: f"{{\\bf {x}}}"
+CITY = lambda x: "{{\\bf {city}}}".format(city=x.replace("_", " ").title())
+
 
 def get_fig_from_ax(ax, **kwargs):
     if not ax:
@@ -72,9 +82,11 @@ class FlatNormFixture(unittest.TestCase):
         self._out_dir = "out"
         self._fig_dir = "figs"
 
-        self.areas = {
+        self.area_codes = {
             'mcbryde': [150692, 150724],
             'hethwood': [150692, 150724],
+            'north_blacksburg': [150724, 150723, 150692],
+            'patrick_henry': [150724, 150723, 150692],
         }
         pass
 
@@ -112,7 +124,7 @@ class FlatNormFixture(unittest.TestCase):
                 output_geometry.append(geom)
         return output_geometry
 
-    def read_networks(self, area=None):
+    def read_actual_network(self, area=None):
         if not area:
             area = self.area
 
@@ -127,24 +139,120 @@ class FlatNormFixture(unittest.TestCase):
             act_geom.extend(get_geometry(df_act['geometry'][i]))
 
         # Get convex hull of the region
-        act_lines = MultiLineString(act_geom)
-        hull = act_lines.convex_hull.buffer(5e-4)
+        # act_lines = MultiLineString(act_geom)
+        hull = MultiLineString(act_geom).convex_hull.buffer(5e-4)
 
+        return act_geom, hull
+
+    def read_synthetic_network(self, codes=list(), area=None, hull=None):
+        if not area:
+            area = self.area
         # Synthetic network
-        synt_net = GetDistNet(self.synt_path, self.areas[area])
+        if not codes:
+            codes = self.area_codes[area]
+
+        # synt_net = GetDistNet(self.synt_path, self.area_codes[area])
+        synt_net = GetDistNet(self.synt_path, codes)
 
         # Get the synthetic network edges in the region
-        synt_nodes = [
-            n for n in synt_net.nodes
-            if Point(synt_net.nodes[n]['cord']).within(hull)
-               and synt_net.nodes[n]['label'] != 'H'
+        if hull:
+            synt_nodes = [
+                n for n in synt_net.nodes
+                if Point(synt_net.nodes[n]['cord']).within(hull)
+                   and synt_net.nodes[n]['label'] != 'H'
+            ]
+            synt_net = nx.subgraph(synt_net, synt_nodes)
+
+        # synt_geom = []
+        # for e in synt_graph.edges:
+        #     synt_geom.extend(get_geometry(synt_net.edges[e]['geometry']))
+        synt_geom = [
+            g
+            # get_geometry(synt_net.edges[e]['geometry'])
+            for e in synt_net.edges
+            for g in get_geometry(synt_net.edges[e]['geometry'])
         ]
-        synt_graph = nx.subgraph(synt_net, synt_nodes)
-        synt_geom = []
-        for e in synt_graph.edges:
-            synt_geom.extend(get_geometry(synt_net.edges[e]['geometry']))
+
+        return synt_geom
+
+    def read_networks(self, area=None):
+        if not area:
+            area = self.area
+
+        # # Actual network
+        act_geom, hull = self.read_actual_network(area)
+        # act_edges_file = f"{self.act_path}/{area}/{area}_edges.shp"
+        # if not os.path.exists(act_edges_file):
+        #     raise ValueError(f"{act_edges_file} doesn't exist!")
+        #
+        # df_act = gpd.read_file(act_edges_file)
+        # act_geom = []
+        # for i in range(len(df_act)):
+        #     act_geom.extend(get_geometry(df_act['geometry'][i]))
+        #
+        # # Get convex hull of the region
+        # act_lines = MultiLineString(act_geom)
+        # hull = act_lines.convex_hull.buffer(5e-4)
+
+        # Synthetic network
+        # synt_net = GetDistNet(self.synt_path, self.area_codes[area])
+        #
+        # # Get the synthetic network edges in the region
+        # synt_nodes = [
+        #     n for n in synt_net.nodes
+        #     if Point(synt_net.nodes[n]['cord']).within(hull)
+        #        and synt_net.nodes[n]['label'] != 'H'
+        # ]
+        # synt_graph = nx.subgraph(synt_net, synt_nodes)
+        # synt_geom = []
+        # for e in synt_graph.edges:
+        #     synt_geom.extend(get_geometry(synt_net.edges[e]['geometry']))
+
+        synt_geom = self.read_synthetic_network(area=area, hull=hull)
 
         return act_geom, synt_geom, hull
+
+    def read_stats(self, fn_stat_file, fn_city_file, in_dir=None):
+        """
+        :param fn_stat_file: f"{fx.area}-FN_STAT_R{num_regions}"
+        :param fn_city_file: f"{fx.area}-FN_STAT_city"
+        :return: fn_df, city_df, city_ratio
+        """
+        if in_dir:
+            fn_stat_file = f"{in_dir}/{fn_stat_file}"
+            fn_city_file = f"{in_dir}/{fn_city_file}"
+
+        fn_stat_file = fn_stat_file if fn_stat_file.endswith(".csv") else f"{fn_stat_file}.csv"
+        fn_city_file = fn_city_file if fn_city_file.endswith(".csv") else f"{fn_city_file}.csv"
+
+        fn_stat_df = pd.read_csv(
+            fn_stat_file,
+            sep=",",
+            dtype={
+                'epsilons': float,
+                'lambdas': int,
+                'flatnorms': np.float64,
+                'norm_lengths': np.float64,
+                'norm_areas': np.float64,
+                'input_lengths': np.float64,
+                'input_ratios': np.float64,
+                'MIN_X': np.float64,
+                'MIN_Y': np.float64,
+                'MAX_X': np.float64,
+                'MAX_Y': np.float64,
+            }
+        )
+        fn_stat_df['id'] = list(range(len(fn_stat_df)))
+        fn_stat_df = fn_stat_df.set_index(['epsilons', 'lambdas'], drop=False)
+
+        fn_city_df = pd.read_csv(
+            fn_city_file,
+            sep=",",
+        )
+        fn_city_df = fn_city_df.set_index(['lambdas'], drop=False)
+        city_ratio = fn_city_df['input_ratios'].max()
+
+        return fn_stat_df, fn_city_df, city_ratio
 
     @staticmethod
     def get_region(point, epsilon=2e-3):
@@ -349,8 +457,8 @@ class FlatNormFixture(unittest.TestCase):
 
         # --- normalization ---
         input_length = np.dot(abs(T1), abs(w)) + np.dot(abs(T2), abs(w))
-        if old_impl:
-            input_length = np.dot(abs(T), abs(w))   # old implementation
+        # if old_impl:
+        #     input_length = np.dot(abs(T), abs(w))   # old implementation
 
         if normalized:
             norm = norm / input_length
@@ -425,11 +533,12 @@ class FlatNormFixture(unittest.TestCase):
         # ---- PLOT ----
         fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
         fnorm_title = f"Flat norm scale, $\\lambda$ = {lambda_:d}" if not fnorm \
-            else f"$\\lambda = {lambda_:d}$, $F_{{\\lambda}}={fnorm:0.3g}$"
+            else f"$\\lambda = {lambda_:d}$, ${FNN}={fnorm:0.3g}$"
+            # else f"$\\lambda = {lambda_:d}$, $F_{{\\lambda}}={fnorm:0.3g}$"
 
         if not fnorm_only:
             plot_triangulation(triangulated, T1, T2, axs[0])
-            axs[0].set_title(f"Radius of region = {epsilon}", fontsize=fontsize)
+            axs[0].set_title(f"$\\epsilon = {epsilon}$", fontsize=fontsize)
 
             plot_norm(triangulated, echain, tchain, axs[1])
             axs[1].set_title(fnorm_title, fontsize=fontsize)
@@ -456,7 +565,10 @@ class FlatNormFixture(unittest.TestCase):
             **kwargs
     ):
         kwargs.setdefault('figsize', (10, 10))
-        fontsize = kwargs.get('fontsize', 20)
+        fontsize = kwargs.get('fontsize', 16)
+        fontsize = kwargs.get('xylabel_fontsize', fontsize)
+        title_fontsize = kwargs.get('title_fontsize', fontsize + 3)
+
         do_return = kwargs.get('do_return', False)
 
         # ---- PLOT ----
@@ -467,23 +579,370 @@ class FlatNormFixture(unittest.TestCase):
             markers='o',
             palette=sns.color_palette("mako_r", 16)
         )
-        ax.set_xlabel(r"Scale ($\lambda$) for multi-scale flat norm", fontsize=fontsize)
-        ax.set_ylabel(r"Normalized multi-scale flat norm", fontsize=fontsize)
+        ax.set_xlabel(f"$\lambda$", fontsize=fontsize)
+        ax.set_ylabel(f"${FNN}$",
+                      rotation=kwargs.get('y_label_rotation', 'vertical'),
+                      fontsize=fontsize)
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
             suptitle = f"{to_file}"
             if kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} :  {kwargs.get('suptitle_sfx')};"
-            fig.suptitle(suptitle, fontsize=fontsize + 3)
+            fig.suptitle(suptitle, fontsize=title_fontsize)
             close_fig(fig, to_file, show, bbox_inches='tight')
 
         if do_return:
             return fig, ax
         pass
 
+    def plot_hist_fn(self, fn_df, city_df, lambda_, epsilon=None, ax=None, **kwargs):
+        fig, ax, _ = get_fig_from_ax(ax, **kwargs)
+        lambda_ = int(lambda_)
 
-class FlatNormMcbrydeRuns(FlatNormFixture):
+        colors = {
+            'city': kwargs.get('city_color', 'xkcd:electric blue'),
+            'hist': kwargs.get('hist_color', 'xkcd:pastel blue'),
+            'fn_mean': kwargs.get('fn_mean_color', 'xkcd:kelly green'),
+        }
+
+        # flatnorm VS ratios ------------------------------------------------------
+        if epsilon:
+            fn_df = fn_df.loc[(epsilon, lambda_),].copy()
+        else:
+            idx = pd.IndexSlice
+            fn_df = fn_df.loc[idx[:, lambda_],].copy()
+
+        # flatnorm histogram -------------------------------------------------------
+        hist_data = ax.hist(
+            fn_df['flatnorms'],
+            bins=20, color=colors['hist'],
+            range=(0, 1),
+        )
+
+        # mean flatnorm -----------------------------------------------------------
+        fn_mean = fn_df['flatnorms'].mean()
+        fn_sd = fn_df['flatnorms'].std()
+        ax.plot(
+            [fn_mean, fn_mean], [0, 100],
+            c=colors['fn_mean'], linewidth=3
+        )
+        ax.plot(
+            [fn_mean - fn_sd, fn_mean - fn_sd], [0, 100],
+            c=colors['fn_mean'], linewidth=1, linestyle=long_dashed
+        )
+        ax.plot(
+            [fn_mean + fn_sd, fn_mean + fn_sd], [0, 100],
+            c=colors['fn_mean'], linewidth=1, linestyle=long_dashed
+        )
+
+        # city flatnorm -----------------------------------------------------------
+        city_fn = city_df.at[lambda_, 'flatnorms']
+        ax.plot(
+            [city_fn, city_fn], [0, 100],
+            c=colors['city'], linewidth=3
+        )
+
+        # ticks -------------------------------------------------------------------
+        ax.set_xticks([city_fn, fn_mean],
+                      labels=[f"{city_fn:0.3g}", f"{fn_mean:0.3g}"],
+                      minor=True,
+                      )
+
+        for tlabel, tcolor in zip(ax.get_xticklabels(minor=True), [colors['city'], colors['fn_mean']]):
+            tlabel.set_color(tcolor)
+
+        # plot title --------------------------------------------------------------
+        titles = dict(
+            # fn=f"$\\hat{{F}}_{{\\lambda}}={fn_mean:0.3f} \pm {fn_sd:0.3f}$",
+            fn=f"${FNM} = {fn_mean:0.3g} \pm {fn_sd:0.3g}$",
+            city=f"${FNC} = {city_fn:0.3g}$"
+        )
+        which_titles = kwargs.get('titles', list(titles.keys()))
+
+        title_styles = dict(
+            ll=f"$\\lambda={{lambda_:d}}$",
+            le=f"$\\lambda={{lambda_:d}}$, $\\epsilon={{epsilon:0.4f}}$",
+            el=f"$\\epsilon={{epsilon:0.4f}}$, $\\lambda={{lambda_:d}}$",
+        )
+        title_style = kwargs.get('title_style', 'le')
+
+        if epsilon:
+            title = title_styles[title_style].format(lambda_=lambda_, epsilon=epsilon)
+        else:
+            title = title_styles['ll'].format(lambda_=lambda_)
+
+        # subtitle = ", ".join([t_str for t_name, t_str in titles.items() if t_name in which_titles])
+        subtitle = ", ".join([titles[t_name] for t_name in which_titles])
+        title = f"{title}\n{subtitle}" if subtitle else title
+        ax.set_title(title, fontsize=kwargs.get('title_fontsize', 18))
+
+        # plot config -------------------------------------------------------------
+        ax.set_xlabel(f"${FNN}$",
+                      # rotation='horizontal',
+                      fontsize=kwargs.get('xylabel_fontsize', 16))
+
+        ax.set_ylim(bottom=0, top=hist_data[0].max() + 1)
+        ax.set_xlim(left=-0.02, right=1.02)
+        return fn_mean, city_fn
+
+    def plot_fn_vs_ratio(self, fn_df, city_df, lambda_, epsilon=None, ax=None, **kwargs):
+        """
+        :param kwargs: highlight: set, highlight_marker: str, highlight_size: int;
+                       titles: list, title_style: str;
+                       reg_line: bool, mean_line: bool, city_point: bool;
+                       scatter_size: int, y_label_rotation: str,
+                       X_color: str -- where X in {city, scatter, highlight, fn_mean, regression}
+                       X_fontsize: int -- where X in {title, xylabel};
+                       if ax is None: figsize, constrained_layout
+        """
+        fig, ax, _ = get_fig_from_ax(ax, **kwargs)
+        lambda_ = int(lambda_)
+
+        colors = {
+            'city': kwargs.get('city_color', 'xkcd:electric blue'),
+            'scatter': kwargs.get('scatter_color', 'xkcd:pastel blue'),
+            'highlight': kwargs.get('highlight_color', 'xkcd:pumpkin'),
+            'fn_mean': kwargs.get('fn_mean_color', 'xkcd:kelly green'),
+            'regression': kwargs.get('regression_color', 'red'),
+        }
+
+        # flatnorm VS ratios ------------------------------------------------------
+        if epsilon:
+            fn_df = fn_df.loc[(epsilon, lambda_), ].copy()
+        else:
+            idx = pd.IndexSlice
+            fn_df = fn_df.loc[idx[:, lambda_], ].copy()
+
+        x_ratios = fn_df['input_ratios'].to_numpy()
+        y_flatnorms = fn_df['flatnorms'].to_numpy()
+
+        if highlight := kwargs.get('highlight', list()):
+            if not isinstance(highlight, (list, set)):
+                highlight = set(highlight)
+            fn_df['color'] = colors['scatter']
+            fn_df.loc[fn_df['id'].isin(highlight), 'color'] = colors['highlight']
+            colors['scatter'] = fn_df['color'].to_list()
+
+        ax.scatter(
+            x_ratios, y_flatnorms,
+            alpha=0.7,
+            s=kwargs.get('scatter_size', 5 ** 2),
+            c=colors['scatter'],
+            marker='o'
+        )
+
+        if highlight:
+            ax.scatter(
+                fn_df.loc[fn_df['id'].isin(highlight), 'input_ratios'],
+                fn_df.loc[fn_df['id'].isin(highlight), 'flatnorms'],
+                alpha=0.8,
+                c=colors['highlight'],
+                s=kwargs.get('highlight_size', 12 ** 2),
+                marker=kwargs.get('highlight_marker', 'x'),
+            )
+
+        # mean line ---------------------------------------------------------------
+        fn_mean = y_flatnorms.mean()
+        fn_sd = y_flatnorms.std()
+        if kwargs.get('mean_line', True):
+            ax.plot(
+                [0, 100], [fn_mean, fn_mean],
+                c=colors['fn_mean'], linewidth=3, alpha=0.5
+            )
+            ax.plot(
+                [0, 100], [fn_mean - fn_sd, fn_mean - fn_sd],
+                c=colors['fn_mean'], linewidth=1, linestyle=long_dashed, alpha=0.5,
+            )
+            ax.plot(
+                [0, 100], [fn_mean + fn_sd, fn_mean + fn_sd],
+                c=colors['fn_mean'], linewidth=1, linestyle=long_dashed, alpha=0.5,
+            )
+
+        # city flatnorm -----------------------------------------------------------
+        city_fn, city_ratio = city_df.loc[lambda_, ['flatnorms', 'input_ratios']]
+        if kwargs.get('city_point', True):
+            ax.scatter(
+                [city_ratio], [city_fn],
+                alpha=1, s=15 ** 2, color=colors['city'],
+                marker='*'
+            )
+
+        # regression line ---------------------------------------------------------
+        from sklearn.metrics import r2_score
+        # regression
+        N = len(x_ratios)
+        b, a = np.polyfit(x_ratios, y_flatnorms, deg=1)
+        y_predict = a + b * x_ratios
+        y_var = sum((y_predict - y_flatnorms) ** 2) / (N - 1)
+        y_err = math.sqrt(y_var)
+        b_var = y_var / sum((x_ratios - x_ratios.mean()) ** 2)
+        b_err = math.sqrt(b_var)
+        # correlation & R2
+        fn_ratio_corr = np.corrcoef(x_ratios, y_flatnorms)[0, 1]
+        fn_ratio_r2 = r2_score(y_flatnorms, y_predict)
+
+        if kwargs.get('reg_line', True):
+            xseq = np.linspace(0, 1, num=10)
+            ax.plot(xseq, a + b * xseq, color=colors['regression'], lw=3, alpha=0.5)
+            ax.plot(
+                xseq, a + y_err + b * xseq,
+                color=colors['regression'], lw=1, alpha=0.5, linestyle=long_dashed
+            )
+            ax.plot(
+                xseq, a - y_err + b * xseq,
+                color=colors['regression'], lw=1, alpha=0.5, linestyle=long_dashed
+            )
+
+        # stat data dict ----------------------------------------------------------
+        stat_dict = {
+            'a': a, 'b': b,
+            'err': math.sqrt(y_var),
+            'std_err': np.std(y_predict - y_flatnorms),
+            'b_err': b_err,
+            'corr': fn_ratio_corr,
+            'R2': fn_ratio_r2,
+            'fn_mean': fn_mean,
+            'fn_sd': fn_sd,
+        }
+
+        # ticks -------------------------------------------------------------------
+        ax.set_xticks([city_ratio], [f"{city_ratio:0.3g}"], color=colors['city'], minor=True, )
+        ax.set_yticks([city_fn, fn_mean],
+                      labels=[f"{city_fn:0.3g}", f"{fn_mean:0.3g}"],
+                      minor=True,
+                      )
+
+        for tlabel, tcolor in zip(ax.get_yticklabels(minor=True), [colors['city'], colors['fn_mean']]):
+            tlabel.set_color(tcolor)
+
+        # plot title --------------------------------------------------------------
+        titles = dict(
+            fn=f"${FNM}={fn_mean:0.3g} \pm {fn_sd:0.3g}$",
+            beta=f"$\\hat{{\\beta}}={b:0.3g} \pm {b_err:0.3g}$",
+            corr=f"$\\rho={fn_ratio_corr:0.3g}$",
+            r2=f"$R^{{2}}={fn_ratio_r2:0.3g}$",
+        )
+        which_titles = kwargs.get('titles', list(titles.keys()))
+
+        title_styles = dict(
+            ll=f"$\\lambda={{lambda_:d}}$",
+            le=f"$\\lambda={{lambda_:d}}$, $\\epsilon={{epsilon:0.4f}}$",
+            el=f"$\\epsilon={{epsilon:0.4f}}$, $\\lambda={{lambda_:d}}$",
+        )
+        title_style = kwargs.get('title_style', 'le')
+
+        if epsilon:
+            title = title_styles[title_style].format(lambda_=lambda_, epsilon=epsilon)
+        else:
+            title = title_styles['ll'].format(lambda_=lambda_)
+
+        subtitle = ", ".join([titles[t_name] for t_name in which_titles])
+        title = f"{title}\n{subtitle}"
+        ax.set_title(title, fontsize=kwargs.get('title_fontsize', 18))
+
+        # plot config -------------------------------------------------------------
+        ax.set_xlabel("$|T|/\\epsilon$", fontsize=kwargs.get('xylabel_fontsize', 16))
+        ax.set_ylabel(f"${FNN}$",
+                      rotation=kwargs.get('y_label_rotation', 'vertical'),
+                      fontsize=kwargs.get('xylabel_fontsize', 16))
+        ax.set_xlim(left=0, right=1)
+        ax.set_ylim(bottom=0, top=1.05)
+        return stat_dict
+
+    def plot_selected_regions(self,
+                              region_ids, fn_df, city_df, lambda_, epsilon=None,
+                              axd=dict(), axfn=list(), axtr=list(),
+                              **kwargs):
+        """
+        :param kwargs:
+               plot_fn_vs_ratio ::
+                        highlight: set, titles: list, title_style: str, X_color: str, X_fontsize: int;
+                        if ax is None: figsize, constrained_layout
+        """
+        kwargs.setdefault('titles', ['fn', 'beta', 'r2'])
+        kwargs.setdefault('title_style', "ll")
+        fontsize = kwargs.setdefault('fontsize', 20)
+        fontsize = kwargs.setdefault('title_fontsize', fontsize)
+
+        colors = {
+            'highlight': kwargs.get('highlight_color', 'xkcd:pumpkin'),
+        }
+
+        if not axd:
+            fig, axd = plt.subplot_mosaic(
+                [
+                    ['scatter', 'city'],
+                ],
+                figsize=kwargs.get('figsize', (12, 6)), constrained_layout=True,
+                width_ratios=[3, 7],
+                gridspec_kw={'wspace': 0.05}
+            )
+            axfn = list()
+            axtr = list()
+
+        stats_data = self.plot_fn_vs_ratio(
+            fn_df, city_df, lambda_, epsilon=epsilon,
+            ax=axd['scatter'],
+            highlight=region_ids,
+            **kwargs
+        )
+
+        # read geometries
+        act_geom, synt_geom, hull = kwargs.get('geometries', (None, None, None))
+        if act_geom is None:
+            act_geom, synt_geom, hull = self.read_networks()
+
+        selected_regions = dict()
+        fn_df = fn_df.set_index('id')
+        for r_id in region_ids:
+            region_bounds = fn_df.loc[r_id, ['MIN_X', 'MIN_Y', 'MAX_X', 'MAX_Y']].to_list()
+            selected_regions[r_id] = sg.box(*region_bounds)
+
+        self.plot_regions_list(
+            act_geom, synt_geom, list(selected_regions.values()), self.area,
+            ax=axd['city'],
+            region_color=colors['highlight'],
+            do_return=False, show=False,
+            **kwargs
+        )
+
+        # plot regions' fn
+        if axfn or axtr:
+            which_titles = kwargs.get('region_titles', ['epsilon', 'ratio', 'fn'])
+            for r, r_id in enumerate(region_ids):
+                # flat norm
+                epsilon, ratio, fnorm = fn_df.loc[r_id, ['epsilons', 'input_ratios', 'flatnorms']]
+                region = selected_regions[r_id]
+                titles = {
+                    'lambda': f"$\\lambda = {lambda_:d}$",
+                    'epsilon': f"$\\epsilon = {epsilon}$",
+                    'ratio': f"$|T|/\\epsilon = {ratio:0.3g}$",
+                    'fn': f"${FNN}={fnorm:0.3g}$",
+                }
+                title = ", ".join([titles[t_name] for t_name in which_titles])
+
+                D, T1, T2 = self.get_triangulated_currents(region, act_geom, synt_geom, opts="ps")
+                if axtr:
+                    plot_triangulation(D["triangulated"], T1, T2, axtr[r])
+                    axtr[r].set_title(title, fontsize=fontsize)
+
+                if axfn:
+                    fnorm, enorm, tnorm, w, plot_data = self.compute_region_flatnorm(
+                        D=D, T1=T1, T2=T2,
+                        lambda_=lambda_,
+                        normalized=True,
+                        plot=True
+                    )
+                    plot_norm(plot_data['triangulated'], plot_data['echain'], plot_data['tchain'], axfn[r])
+                    axfn[r].set_title(title, fontsize=fontsize)
+
+        return stats_data
+
+        # pass
+
+
+class FlatNormRuns_Mcbryde(FlatNormFixture):
 
     def __init__(self, methodName: str = ...) -> None:
         super().__init__(methodName)
@@ -801,79 +1260,56 @@ class FlatNormMcbrydeRuns(FlatNormFixture):
 
         pass
 
-    def test_plot_region_flatnorm_lines(self):
-        area = 'mcbryde'
-        # epsilons, lambdas = np.linspace(1e-3, 2e-3, 4), np.linspace(1000, 100000, 5)
-        epsilons, lambdas = np.linspace(5e-4, 2e-3, 4), np.linspace(1000, 100000, 5)
-        num_regions = 6
-        region = 2
+    def test_MB_plot_city_flatnorm_lines(self):
+        self.area = 'mcbryde'
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
 
-        # read geometries
-        act_geom, synt_geom, hull = self.read_networks(area)
-
-        # sample points
-        points, regions = self.sample_regions_geom(
-            hull, act_geom, synt_geom,
-            epsilon=epsilons[0],
-            num_regions=num_regions,
-            seed=self.seed
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
         )
 
-        # plot regions
-        self.fig_dir = "figs/test"
+        # read geometries
+        act_geom, synt_geom, hull = self.read_networks()
+
+        # city region
+        city_bounds = hull.exterior.bounds
+        city_region = sg.box(*city_bounds)
+        city_width, city_height = city_bounds[MAX_X] - city_bounds[MIN_X], city_bounds[MAX_Y] - city_bounds[MIN_Y]
+        epsilon = max(city_width / 2, city_height / 2)
+
+        # plot city region
+        self.fig_dir = "figs/test/fixed_lambdas"
         self.plot_regions_list(
-            act_geom, synt_geom, regions, area,
-            region_highlight=region,
-            file_name_sfx=f"_region_{region}",
+            act_geom, synt_geom, [city_region], self.area,
+            file_name_sfx=f"city",
             do_return=False, show=True,
             figsize=(40, 20)
         )
 
-        # flat norm
-        flatnorm_data = {
-            'epsilons': [], 'lambdas': [], 'flatnorms': [],
-            'norm_lengths': [], 'norm_areas': []
-        }
-
-        start = timer()
-        for epsilon in epsilons:
-            for lambda_ in lambdas:
-                norm, enorm, tnorm, w = self.compute_region_flatnorm(
-                    self.get_region(points[region], epsilon),
-                    act_geom, synt_geom,
-                    lambda_=lambda_,
-                    normalized=True,
-                    plot=False
-                )
-                flatnorm_data['epsilons'].append(f"{epsilon:0.4f}")
-                flatnorm_data['lambdas'].append(lambda_)
-                flatnorm_data['flatnorms'].append(norm)
-                flatnorm_data['norm_lengths'].append(enorm)
-                flatnorm_data['norm_areas'].append(tnorm)
-
-        end = timer()
-
         fig, ax = self.plot_region_flatnorm_lines(
-            epsilons=flatnorm_data['epsilons'],
-            lambdas=flatnorm_data['lambdas'],
-            flatnorms=flatnorm_data['flatnorms'],
-            to_file=f"{area}-flatnorm-lines_region_{region}",
+            epsilons=fn_city_df['epsilons'],
+            lambdas=fn_city_df['lambdas'],
+            flatnorms=fn_city_df['flatnorms'],
+            to_file=f"{self.area}-FIXL-flatnorm_lines_city",
             do_return=True
         )
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
 
         print("--------------------------------------------------------------------------")
-        print(f"compute region flatnorm "
-              f"for {len(epsilons)} epsilons "
-              f"and {len(lambdas)} lambdas = {timedelta(seconds=end-start)}")
+        print(f"plot [{self.area}]'s flatnorm lines "
+              f"for {len(lambdas)} lambdas")
         print("--------------------------------------------------------------------------")
-        pprint(pd.DataFrame(flatnorm_data))
         pass
 
-    def test_plot_city_flatnorm_lines_and_stats(self):
+    def test_MB_STAT_plot_city_flatnorm_lines_and_stats(self):
         self.area = 'mcbryde'
-        lambdas = np.linspace(1000, 100000, 5)
+        # lambdas = np.linspace(1000, 100000, 5)
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
 
         # read geometries
         act_geom, synt_geom, hull = self.read_networks(self.area)
@@ -885,7 +1321,7 @@ class FlatNormMcbrydeRuns(FlatNormFixture):
         epsilon = max(city_width / 2, city_height / 2)
 
         # compute city flat norm
-        flatnorm_data = {
+        fn_city_data = {
             'epsilons': [], 'lambdas': [], 'flatnorms': [],
             'norm_lengths': [], 'norm_areas': [],
             'input_lengths': [], 'input_ratios': [],
@@ -902,13 +1338,13 @@ class FlatNormMcbrydeRuns(FlatNormFixture):
                 normalized=True,
                 plot=False
             )
-            flatnorm_data['epsilons'].append(f"{epsilon:0.4f}")
-            flatnorm_data['lambdas'].append(lambda_)
-            flatnorm_data['flatnorms'].append(norm)
-            flatnorm_data['norm_lengths'].append(enorm)
-            flatnorm_data['norm_areas'].append(tnorm)
-            flatnorm_data['input_lengths'].append(w)
-            flatnorm_data['input_ratios'].append(w / epsilon)
+            fn_city_data['epsilons'].append(f"{epsilon:0.4f}")
+            fn_city_data['lambdas'].append(lambda_)
+            fn_city_data['flatnorms'].append(norm)
+            fn_city_data['norm_lengths'].append(enorm)
+            fn_city_data['norm_areas'].append(tnorm)
+            fn_city_data['input_lengths'].append(w)
+            fn_city_data['input_ratios'].append(w / epsilon)
 
             end = timer()
             print(f">>> LAMBDA[{l}] >>> {timedelta(seconds=end - start)} \n")
@@ -918,10 +1354,10 @@ class FlatNormMcbrydeRuns(FlatNormFixture):
 
         # plot flatnorm lines
         fig, ax = self.plot_region_flatnorm_lines(
-            epsilons=flatnorm_data['epsilons'],
-            lambdas=flatnorm_data['lambdas'],
-            flatnorms=flatnorm_data['flatnorms'],
-            to_file=f"{self.area}-flatnorm-lines_city",
+            epsilons=fn_city_data['epsilons'],
+            lambdas=fn_city_data['lambdas'],
+            flatnorms=fn_city_data['flatnorms'],
+            to_file=f"{self.area}-flatnorm-lines_city-fixed_lambdas",
             do_return=True
         )
         self.assertIsNotNone(fig)
@@ -931,20 +1367,23 @@ class FlatNormMcbrydeRuns(FlatNormFixture):
         print(f"compute city flatnorm "
               f"for {len(lambdas)} lambdas = {timedelta(seconds=end_global-start_global)}")
         print("--------------------------------------------------------------------------")
-        flatnorm_data = pd.DataFrame(flatnorm_data)
-        pprint(flatnorm_data)
+        fn_city_data = pd.DataFrame(fn_city_data)
+        pprint(fn_city_data)
 
         self.out_dir = "out/test"
-        file_name = f"{self.area}-flatnorm-stats_city"
+        file_name = f"{self.area}-FN_STAT_city-fixed_lambdas"
         import csv
         with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
-            flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+            fn_city_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
         pass
 
 
-    def test_flatnorm_stats(self):
+    def test_MB_STAT_flatnorm_stats(self):
         area = 'mcbryde'
-        epsilons, lambdas = np.linspace(5e-4, 2e-3, 4), np.linspace(1000, 100000, 5)
+        # epsilons = np.linspace(5e-4, 2e-3, 4)
+        # lambdas = np.linspace(1000, 100000, 5, dtype=int)
+        epsilons = np.linspace(5e-4, 2e-3, 4)
+        lambdas = np.array([1, 25, 50, 75, 100]) * 1000
         num_regions = 50
 
         # read geometries
@@ -1008,14 +1447,259 @@ class FlatNormMcbrydeRuns(FlatNormFixture):
         pprint(flatnorm_data)
 
         self.out_dir = "out/test"
-        file_name = f"{area}-flatnorm-stats_{num_regions}_regions"
+        file_name = f"{area}-FN_STAT_R{num_regions}-fixed_lambdas"
         import csv
         with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
             flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
         pass
 
 
-class FlatNormHethwoodRuns(FlatNormFixture):
+    def test_MB_plot_fn_stats_hists__by_lambda(self):
+        # import matplotlib as mpl
+        # mpl.rcParams["mathtext.fontset"] = "dejavuserif"
+        # mpl.rcParams["mathtext.fontset"] = "dejavusans"
+        # mpl.rcParams["mathtext.fontset"] = "stix"
+        # plt.rcParams.update({
+        #     "text.usetex": True,
+        #     "font.family": "Helvetica"
+        # })
+
+        self.area = 'mcbryde'
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
+        )
+
+        L = len(lambdas)
+        fig, axs = plt.subplots(1, L, figsize=(L * 10, 10), constrained_layout=True)
+
+        fn_means, fn_cities = list(), list()
+        for l, lambda_ in enumerate(lambdas):
+            fnm, fnc = self.plot_hist_fn(
+                flatnorm_df, fn_city_df, lambda_, ax=axs[l],
+                titles=['fn', 'city'],
+
+            )
+            fn_means.append(fnm)
+            fn_cities.append(fnc)
+            pass
+
+        fnm_mean, fnm_std = np.array(fn_means).mean(), np.array(fn_means).std()
+        fnc_mean, fnc_std = np.array(fn_cities).mean(), np.array(fn_cities).std()
+
+        # fnm_suptitle = f"${{\\sf mean}}({FNM})={fnm_mean:0.3g}, {{\\sf sd}}({FNM})={fnm_std:0.3g}$"
+        fnm_suptitle_short = f"${FNM}={fnm_mean:0.3g} \\pm {fnm_std:0.3g}$"
+        city_suptitle = f"${CITY(self.area)} : {FNC}={fnc_mean:0.3g} \\pm {fnc_std:0.3g}$"
+        fig.suptitle(f"{city_suptitle}\n{fnm_suptitle_short}", fontsize=25)
+
+        self.fig_dir = "figs/test/fixed_lambdas"
+        file_name = f"{self.area}-R{num_regions}-FIXL-flatnorm_hists_lambdas"
+        close_fig(fig, to_file=f"{self.fig_dir}/{file_name}.png", show=True)
+
+        pass
+
+    def test_MB_plot_fn_stats_hists__all(self):
+        self.area = 'mcbryde'
+        epsilons = np.linspace(5e-4, 2e-3, 4)
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
+        )
+
+        L, E = len(lambdas), len(epsilons)
+        fig, axs = plt.subplots(E, L, figsize=(L * 10, E * 10), constrained_layout=True)
+
+        fn_means, fn_cities = list(), list()
+        for e, epsilon in enumerate(epsilons):
+            for l, lambda_ in enumerate(lambdas):
+                fnm, fnc = self.plot_hist_fn(
+                    flatnorm_df, fn_city_df, lambda_, epsilon=epsilon,
+                    ax=axs[e][l],
+                    titles=['fn', 'city'],
+                    title_style="el",
+                )
+                fn_means.append(fnm)
+                fn_cities.append(fnc)
+                pass
+
+        fnm_mean, fnm_std = np.array(fn_means).mean(), np.array(fn_means).std()
+        fnc_mean, fnc_std = np.array(fn_cities).mean(), np.array(fn_cities).std()
+
+        # fnm_suptitle = f"${{\\sf mean}}({FNM})={fnm_mean:0.3g}, {{\\sf sd}}({FNM})={fnm_std:0.3g}$"
+        fnm_suptitle_short = f"${FNM}={fnm_mean:0.3g} \\pm {fnm_std:0.3g}$"
+        city_suptitle = f"${CITY(self.area)} : {FNC}={fnc_mean:0.3g} \\pm {fnc_std:0.3g}$"
+        fig.suptitle(f"{city_suptitle}\n{fnm_suptitle_short}", fontsize=25)
+
+        self.fig_dir = "figs/test/fixed_lambdas"
+        file_name = f"{self.area}-R{num_regions}-FIXL-flatnorm_hists_all"
+        close_fig(fig, to_file=f"{self.fig_dir}/{file_name}.png", show=True)
+        pass
+
+    def test_MB_plot_fn_stats_vs_ratios__by_lambda(self):
+        self.area = 'mcbryde'
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
+        )
+
+        # BY LAMBDAS
+        L = len(lambdas)
+        fig, axs = plt.subplots(1, L, figsize=(L * 10, 11), constrained_layout=True)
+        reg_coefs_dict = dict()
+
+        for l, lambda_ in enumerate(lambdas):
+            reg_coefs_dict[lambda_] = self.plot_fn_vs_ratio(
+                flatnorm_df, fn_city_df, lambda_,
+                ax=axs[l],
+                titles=['fn', 'beta', 'r2'],
+                y_label_rotation='horizontal',
+            )
+
+        reg_coefs_data = pd.DataFrame(reg_coefs_dict).transpose()
+        beta_mean, beta_std = reg_coefs_data['b'].mean(), reg_coefs_data['b'].std()
+
+        beta_suptitle = f"mean($\\hat{{\\beta}}$)={beta_mean:0.4g}, sd($\\hat{{\\beta}}$)={beta_std:0.4g}"
+        city_suptitle = f"${CITY(self.area)} : |T|/\\epsilon = {fn_city_df['input_ratios'].max():0.3g}$"
+        fig.suptitle(f"{city_suptitle}\n{beta_suptitle}", fontsize=25)
+
+        self.fig_dir = "figs/test/fixed_lambdas"
+        file_name = f"{self.area}-R{num_regions}-FIXL-flatnorm_vs_ratios_lambdas"
+        close_fig(fig, to_file=f"{self.fig_dir}/{file_name}.png", show=True)
+    
+        # save reg_coefs_data
+        self.out_dir = "out/test"
+        file_name = f"{self.area}-FN_REG_R{num_regions}_by_lambdas-fixed_lambdas"
+        import csv
+        with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
+            reg_coefs_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+            
+        pass
+
+    def test_MB_plot_fn_stats_vs_ratios__all(self):
+        self.area = 'mcbryde'
+        epsilons = np.linspace(5e-4, 2e-3, 4)
+        # lambdas = np.linspace(1000, 100000, 5, dtype=int)
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            # f"{self.area}-FN_STAT_R{num_regions}",
+            # f"{self.area}-FN_STAT_city",
+            in_dir="out/test"
+        )
+
+        L, E = len(lambdas), len(epsilons)
+        fig, axs = plt.subplots(E, L, figsize=(L * 10, E * 11), constrained_layout=True)
+        reg_coefs_dict = dict()
+        for e, epsilon in enumerate(epsilons):
+            for l, lambda_ in enumerate(lambdas):
+                reg_coefs_dict[(epsilon, lambda_)] = self.plot_fn_vs_ratio(
+                    flatnorm_df, fn_city_df, lambda_, epsilon=epsilon,
+                    ax=axs[e][l],
+                    titles=['fn', 'beta', 'r2'],
+                    title_style="el",
+                    y_label_rotation='horizontal',
+                )
+
+        reg_coefs_data = pd.DataFrame(reg_coefs_dict).transpose()
+        beta_mean, beta_std = reg_coefs_data['b'].mean(), reg_coefs_data['b'].std()
+
+        beta_suptitle = f"mean($\\hat{{\\beta}}$)={beta_mean:0.4g}, sd($\\hat{{\\beta}}$)={beta_std:0.4g}"
+        city_suptitle = f"${CITY(self.area)} : |T|/\\epsilon = {fn_city_df['input_ratios'].max():0.3g}$"
+        fig.suptitle(f"{city_suptitle}\n{beta_suptitle}", fontsize=25)
+
+
+        self.fig_dir = "figs/test/fixed_lambdas"
+        file_name = f"{self.area}-R{num_regions}-FIXL-flatnorm_vs_ratios_all"
+        # file_name = f"{self.area}-flatnorm-input-ratios_{num_regions}_regions"
+        close_fig(fig, to_file=f"{self.fig_dir}/{file_name}.png", show=True)
+
+
+        # save reg_coefs_data
+        self.out_dir = "out/test"
+        file_name = f"{self.area}-FN_REG_R{num_regions}_all-fixed_lambdas"
+        # file_name = f"{self.area}-FN_REG_R{num_regions}_all"
+        import csv
+        with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
+            reg_coefs_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
+
+        pass
+
+    def test_MP_PLOT_selected_regions__max_fn(self):
+        self.area = 'mcbryde'
+        lambdas = np.array([1, 25, 50, 75, 100], dtype=int) * 1000
+        num_regions = 50
+        self.out_dir = "out/test"
+
+        flatnorm_df, fn_city_df, city_ratio = self.read_stats(
+            f"{self.area}-FN_STAT_R{num_regions}-fixed_lambdas",
+            f"{self.area}-FN_STAT_city-fixed_lambdas",
+            in_dir="out/test"
+        )
+
+        # lambdas = np.linspace(1000, 100000, 5, dtype=int)
+        L = len(lambdas)
+
+        fig, axd = plt.subplot_mosaic(
+            [
+                # ['scatter', 'city'],
+                ['scatter', 'scatter', 'city', 'city', 'city'],
+                ['t1', 't2', 't3', 't4', 't5'],
+                # ['r1', 'r2', 'r3', 'r4', 'r5'],
+            ],
+            figsize=(25, 16), constrained_layout=True,
+            width_ratios=[2, 2, 2, 2, 2],
+            gridspec_kw={'wspace': 0.05}
+        )
+        # )
+
+        l, lambda_ = 0, lambdas[0]
+
+        idx = pd.IndexSlice
+        fn_df_lambda = flatnorm_df.loc[idx[:, lambda_],].copy()
+        # selected_regions_ids=fn_df_lambda.loc[fn_df_lambda['flatnorms'] == 1, 'id'].to_list()
+
+        selected_regions_ids = fn_df_lambda.sort_values(by='flatnorms', ascending=False)['id'].to_list()[:5]
+
+        self.plot_selected_regions(
+            selected_regions_ids, flatnorm_df, fn_city_df, lambda_,
+            axd=axd,
+            axtr=[axd['t1'], axd['t2'], axd['t3'], axd['t4'], axd['t5']],
+            # axfn=[axd['r1'], axd['r2'], axd['r3'], axd['r4'], axd['r5'], ],
+        )
+
+        city_suptitle = f"${CITY(self.area)} : |T|/\\epsilon = {city_ratio:0.3}$"
+        # fig.suptitle(f"{city_suptitle}\n{beta_suptitle}", fontsize=25)
+        fig.suptitle(f"{city_suptitle} : max fn", fontsize=25)
+
+        self.fig_dir = "figs/test/fixed_lambdas"
+        file_name = f"{self.area}-R{num_regions}-FIXL-selected_regions_l{lambda_}-max_fn"
+
+        close_fig(fig, to_file=f"{self.fig_dir}/regions/{file_name}.png", show=True)
+
+    pass
+
+
+
+class FlatNormRuns_Hethwood(FlatNormFixture):
 
     def __init__(self, methodName: str = ...) -> None:
         super().__init__(methodName)
@@ -1024,7 +1708,7 @@ class FlatNormHethwoodRuns(FlatNormFixture):
         self.area = 'hethwood'
         pass
 
-    def test_hethwood_sample_regions_geom(self):
+    def test_HW_sample_regions_geom(self):
         epsilon = 2e-3
         num_regions = 6
 
@@ -1053,7 +1737,7 @@ class FlatNormHethwoodRuns(FlatNormFixture):
         self.assertIsNotNone(ax)
         pass
 
-    def test_hethwood_compute_and_plot_city_flatnorm(self):
+    def test_HW_compute_and_plot_city_flatnorm(self):
         lambda_ = 1000
 
         # read geometries
@@ -1107,7 +1791,7 @@ class FlatNormHethwoodRuns(FlatNormFixture):
         pass
 
 
-    def test_hethwood_plot_city_flatnorm_lines_and_stats(self):
+    def test_HW_plot_city_flatnorm_lines_and_stats(self):
         lambdas = np.linspace(1000, 100000, 5)
 
         # read geometries
@@ -1170,14 +1854,14 @@ class FlatNormHethwoodRuns(FlatNormFixture):
         pprint(flatnorm_data)
 
         self.out_dir = "out/test"
-        file_name = f"{self.area}-flatnorm-stats_city"
+        file_name = f"{self.area}-FN_STAT_city"
         import csv
         with open(f"{self.out_dir}/{file_name}.csv", "w") as outfile:
             flatnorm_data.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
         pass
 
 
-    def test_hethwood_flatnorm_stats(self):
+    def test_HW_flatnorm_stats(self):
         epsilons, lambdas = np.linspace(5e-4, 2e-3, 4), np.linspace(1000, 100000, 5)
         num_regions = 50
 
