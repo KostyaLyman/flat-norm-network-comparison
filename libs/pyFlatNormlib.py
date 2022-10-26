@@ -18,6 +18,8 @@ from pyUtilslib import simpvol, boundary_matrix
 from pyLPsolverlib import lp_solver
 from pyGeometrylib import geodist
 
+from timeit import default_timer as timer
+from datetime import timedelta
 
 def get_geometry(geometry):
     vertices = [Point(c) for c in geometry.coords]
@@ -26,7 +28,7 @@ def get_geometry(geometry):
             if geodist(pt1, pt2) > 1e-6]
 
 
-def get_current(triangle_structure, geometry):
+def get_current(triangle_structure, geometry) -> np.array:
     current = []
     vertices = triangle_structure['vertices'].tolist()
     for edge in triangle_structure['edges'].tolist():
@@ -92,7 +94,7 @@ def prepare_triangulation(segments1, segments2):
     return struct
 
 
-def perform_triangulation(act_geom, syn_geom, adj=1, verbose=False):
+def perform_triangulation(act_geom, syn_geom, adj=1, verbose=False, opts='ps'):
     # Initialize dictionary
     dict_struct = {}
 
@@ -108,40 +110,50 @@ def perform_triangulation(act_geom, syn_geom, adj=1, verbose=False):
                                                       [-37] * len(vertices)]))
     adj_struct = {'vertices': adj_vertices,
                   'segments': struct['segments']}
-    try:
-        adj_tri_struct = tr.triangulate(adj_struct, opts='ps')
-        adj_tri_vertices = adj_tri_struct['vertices']
-        adj_mat = np.column_stack([[80] * len(adj_tri_vertices),
-                                   [-37] * len(adj_tri_vertices)])
-        tri_struct = {'vertices': (adj_tri_vertices / adj) - adj_mat,
-                      'segments': adj_tri_struct['segments'],
-                      'triangles': adj_tri_struct['triangles']}
+    # try:
+    if verbose:
+        start_tri = timer()
+        print("Task started: Performed triangulation on points")
 
-        edges = []
-        for tgl in tri_struct['triangles']:
-            if ([tgl[0], tgl[1]] not in edges) and ([tgl[1], tgl[0]] not in edges):
-                edges.append([tgl[0], tgl[1]])
-            if ([tgl[1], tgl[2]] not in edges) and ([tgl[2], tgl[1]] not in edges):
-                edges.append([tgl[1], tgl[2]])
-            if ([tgl[2], tgl[0]] not in edges) and ([tgl[0], tgl[2]] not in edges):
-                edges.append([tgl[2], tgl[0]])
-        tri_struct['edges'] = np.array(edges)
-        dict_struct['triangulated'] = tri_struct
-        if verbose:
-            print("Task completed: Performed triangulation on points")
+    # adj_tri_struct = tr.triangulate(adj_struct, opts='psV')
+    # adj_tri_struct = tr.triangulate(adj_struct, opts='sV')
+    adj_tri_struct = tr.triangulate(adj_struct, opts=opts)
+    if verbose:
+        end_tri = timer()
+        print(f"Task completed: Performed triangulation on points : t={timedelta(seconds=end_tri-start_tri)}")
 
-        # update input geometries with intersecting points
-        V = tri_struct['vertices'].tolist()
-        dict_struct['actual'] = update_segment(act_geom, V)
-        dict_struct['synthetic'] = update_segment(syn_geom, V)
-        if verbose:
-            print("Task completed: Updated geometries with intersecting points")
+    adj_tri_vertices = adj_tri_struct['vertices']
+    adj_mat = np.column_stack([[80] * len(adj_tri_vertices),
+                               [-37] * len(adj_tri_vertices)])
+    tri_struct = {'vertices': (adj_tri_vertices / adj) - adj_mat,
+                  'segments': adj_tri_struct['segments'],
+                  'triangles': adj_tri_struct['triangles']}
 
-    except:
-        print("Failed triangulation!!!")
-        dict_struct['actual'] = act_geom
-        dict_struct['synthetic'] = syn_geom
-        dict_struct['triangulated'] = None
+    edges = []
+    for tgl in tri_struct['triangles']:
+        if ([tgl[0], tgl[1]] not in edges) and ([tgl[1], tgl[0]] not in edges):
+            edges.append([tgl[0], tgl[1]])
+        if ([tgl[1], tgl[2]] not in edges) and ([tgl[2], tgl[1]] not in edges):
+            edges.append([tgl[1], tgl[2]])
+        if ([tgl[2], tgl[0]] not in edges) and ([tgl[0], tgl[2]] not in edges):
+            edges.append([tgl[2], tgl[0]])
+    tri_struct['edges'] = np.array(edges)
+    dict_struct['triangulated'] = tri_struct
+    if verbose:
+        print("Task completed: Performed triangulation on points")
+
+    # update input geometries with intersecting points
+    V = tri_struct['vertices'].tolist()
+    dict_struct['actual'] = update_segment(act_geom, V)
+    dict_struct['synthetic'] = update_segment(syn_geom, V)
+    if verbose:
+        print("Task completed: Updated geometries with intersecting points")
+
+    # except:
+    #     print("Failed triangulation!!!")
+    #     dict_struct['actual'] = act_geom
+    #     dict_struct['synthetic'] = syn_geom
+    #     dict_struct['triangulated'] = None
 
     return dict_struct
 

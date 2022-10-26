@@ -15,7 +15,11 @@ from datetime import timedelta
 import numpy as np
 import pandas as pd
 import csv
-from pprint import pprint
+
+
+FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
+# FNN = NORMALIZED_FLAT_NORM = "\\tilde{{\\mathbb{{F}}}}_{{\\lambda}}"
+FNN = NORMALIZED_FLAT_NORM = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}"
 
 
 workpath = os.getcwd()
@@ -28,7 +32,7 @@ from pyDrawNetworklib import get_vertseg_geometry
 # get fixture
 fx = FlatNormFixture('runTest')
 fx.out_dir = "out/script"
-fx.fig_dir = "figs/script"
+fx.fig_dir = "figs/test"
 
 
 
@@ -59,11 +63,19 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
         compare_hausdorff=False
     )
     
+    titles = {
+        'lambda': f"$\\lambda = {lambda_:d}$",
+        'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
+        'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
+        'fn': f"${FNN}={norm:0.3g}$",
+    }
+    title = ", ".join([titles[t_name] for t_name in titles])
+    
     # plot flat norm
     fx.plot_triangulated_region_flatnorm(
         epsilon=eps, lambda_=lamb_,
         to_file=f"{area}-fn_region_{region}-eps_{epsilon:0.4f}",
-        suptitle_sfx=f"$\\epsilon$={epsilon:0.5f} : |T| = {w:0.5f} : |T| / $\\epsilon$ = {w / epsilon:0.4f} \n $\lambda$ = {lambda_} : FN = {norm:0.5f} ",
+        suptitle_sfx=title,
         do_return=False, show=True,
         **plot_data
         )
@@ -84,7 +96,7 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
 epsilon = 1e-3
 lambda_ = 1000
 
-ind = 930
+ind = 1003
 compute_flat_norm_region(ind, verts[ind],epsilon,lambda_)
 
 sys.exit(0)
