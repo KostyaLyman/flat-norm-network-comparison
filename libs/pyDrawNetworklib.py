@@ -228,10 +228,10 @@ def plot_norm(tri_struct, x, s, ax, **kwargs):
     # ---- region of fixed size ----
     region_bound = kwargs.get('region_bound', None)
     if region_bound:
-        k = np.pi/180.0
-        xmin,xmax,ymin,ymax = region_bound.bounds
-        ax.set_xlim(xmin*k,xmax*k)
-        ax.set_ylim(ymin*k,ymax*k)
+        xmin,ymin,xmax,ymax = region_bound.bounds
+        delta = 1.2e-3
+        ax.set_xlim(xmin-delta,xmax+delta)
+        ax.set_ylim(ymin-delta,ymax+delta)
     return ax
 
 
@@ -287,9 +287,10 @@ def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
     # ---- region of fixed size ----
     region_bound = kwargs.get('region_bound', None)
     if region_bound:
-        xmin,xmax,ymin,ymax = region_bound.bounds
-        ax.set_xlim(xmin,xmax)
-        ax.set_ylim(ymin,ymax)
+        xmin,ymin,xmax,ymax = region_bound.bounds
+        delta = 1.2e-3
+        ax.set_xlim(xmin-delta,xmax+delta)
+        ax.set_ylim(ymin-delta,ymax+delta)
     
     # ---- legend for figure ----
     legend = kwargs.get('legend', False)
@@ -310,11 +311,11 @@ def plot_regions(act_geom, syn_geom, geom_regions, ax,  **kwargs):
     geom1_vertices, geom1_segments = get_vertseg_geometry(act_geom)
     geom2_vertices, geom2_segments = get_vertseg_geometry(syn_geom)
     # Plot 1: Plot the geometries of the pair of networks
-    draw_points(ax, geom1_vertices, color='red', size=20, alpha=1.0, marker='o')
-    draw_lines(ax, geom1_segments, color='red', width=2.0, style='solid', alpha=1.0,
+    draw_points(ax, geom1_vertices, color='red', size=10, alpha=1.0, marker='o')
+    draw_lines(ax, geom1_segments, color='red', width=1.0, style='solid', alpha=1.0,
                directed=False, label='Actual Network')
-    draw_points(ax, geom2_vertices, color='blue', size=20, alpha=1.0, marker='o')
-    draw_lines(ax, geom2_segments, color='blue', width=2.0, style='solid', alpha=1.0,
+    draw_points(ax, geom2_vertices, color='blue', size=10, alpha=1.0, marker='o')
+    draw_lines(ax, geom2_segments, color='blue', width=1.0, style='solid', alpha=1.0,
                directed=False, label='Synthetic Network')
     ax.legend(fontsize=18, markerscale=2)
     if highlight is not None:

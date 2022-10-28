@@ -34,13 +34,16 @@ from libs.pyDrawNetworklib import plot_regions, plot_triangulation
 MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 long_dashed = (5, (10, 3))
 
+area_name = {
+    'mcbryde': r'Location\ A',
+    'patrick_henry': r'Location\ B',
+    'hethwood': r'Location\ C'}
+
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
-# FNN = NORMALIZED_FLAT_NORM = "\\tilde{{\\mathbb{{F}}}}_{{\\lambda}}"
 FNN = NORMALIZED_FLAT_NORM = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}"
-FNNM = FNM = FLAT_NORM_MEAN = "\\hat{{\\mathbb{{F}}}}_{{\\lambda}}"
+FNNM = FNM = FLAT_NORM_MEAN = "\\widehat{{\\mathbb{{F}}}}_{{\\lambda}}"
 FNNC = FNC = FLAT_NORM_CITY = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}^{{\\  G}}"
-# CITY = lambda x: f"{{\\bf {x}}}"
-CITY = lambda x: "{{\\bf {city}}}".format(city=x.replace("_", " ").title())
+CITY = lambda x: f"{{\\bf {area_name[x]}}}"
 
 
 def get_fig_from_ax(ax, **kwargs):
@@ -406,12 +409,12 @@ class FlatNormFixture(unittest.TestCase):
         """
         verbose = kwargs.setdefault('verbose', False)
         plot = kwargs.get('plot', False)
-        old_impl = kwargs.get('old_impl', False)
-
+        # old_impl = kwargs.get('old_impl', False)
+        
         # compute triangulation and currents
-        # if not D or not T1 or not T2:
         if not D:
-            D, T1, T2 = self.get_triangulated_currents(region, act_geom, synt_geom, **kwargs)
+            D, T1, T2 = self.get_triangulated_currents(
+                region, act_geom, synt_geom, **kwargs)
         T = T1 - T2
 
         if not D or T1.size == 0 or T2.size == 0:
@@ -448,6 +451,7 @@ class FlatNormFixture(unittest.TestCase):
                 T2=T2,
                 echain=x,
                 tchain=s,
+                region=region
             )
             return norm, enorm, tnorm, input_length, plot_data
 
@@ -502,33 +506,35 @@ class FlatNormFixture(unittest.TestCase):
             ax=None, to_file=None, show=True,
             **kwargs
     ):
-        kwargs.setdefault('figsize', (20, 10))
+        kwargs.setdefault('figsize', (13, 8))
         fontsize = kwargs.get('fontsize', 20)
         do_return = kwargs.get('do_return', False)
+        region = kwargs.get('region', None)
 
         # ---- PLOT ----
         fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
-        fnorm_title = f"Flat norm scale, $\\lambda$ = {lambda_:d}" if not fnorm \
-            else f"$\\lambda = {lambda_:d}$, ${FNN}={fnorm:0.3g}$"
-            # else f"$\\lambda = {lambda_:d}$, $F_{{\\lambda}}={fnorm:0.3g}$"
+        # fnorm_title = f"Flat norm scale, $\\lambda$ = {lambda_:d}" if not fnorm \
+        #     else f"$\\lambda = {lambda_:d}$, ${FNN}={fnorm:0.3g}$"
 
         if not fnorm_only:
-            plot_triangulation(triangulated, T1, T2, axs[0])
-            axs[0].set_title(f"$\\epsilon = {epsilon}$", fontsize=fontsize)
+            plot_triangulation(triangulated, T1, T2, axs[0], 
+                               region_bound=region, legend=True)
+            # axs[0].set_title(f"$\\epsilon = {epsilon}$", fontsize=fontsize)
 
-            plot_norm(triangulated, echain, tchain, axs[1])
-            axs[1].set_title(fnorm_title, fontsize=fontsize)
+            plot_norm(triangulated, echain, tchain, axs[1], region_bound=region)
+            # axs[1].set_title(fnorm_title, fontsize=fontsize)
         else:
-            plot_norm(triangulated, echain, tchain, axs)
-            axs.set_title(fnorm_title, fontsize=fontsize)
+            plot_norm(triangulated, echain, tchain, axs, 
+                      region_bound=region, legend=True)
+            # axs.set_title(fnorm_title, fontsize=fontsize)
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
-            suptitle = f"{to_file}"
-            if suptitle_sfx := kwargs.get('suptitle_sfx'):
-                suptitle = f"{suptitle} : {suptitle_sfx}"
+            suptitle = ""
+            if suptitle := kwargs.get('suptitle'):
+                suptitle = f"{suptitle}"
 
-            fig.suptitle(suptitle, fontsize=fontsize + 3)
+            fig.suptitle(suptitle, fontsize=fontsize + 8)
             close_fig(fig, to_file, show, bbox_inches='tight')
 
         if do_return:
@@ -620,9 +626,12 @@ class FlatNormFixture(unittest.TestCase):
         )
 
         # ticks -------------------------------------------------------------------
+        ax.tick_params(left=False, labelleft=False, labelsize=20)
         ax.set_xticks([city_fn, fn_mean],
                       labels=[f"{city_fn:0.3g}", f"{fn_mean:0.3g}"],
                       minor=True,
+                      fontsize=kwargs.get('xtick_fontsize', 16),
+                      rotation=45,
                       )
 
         for tlabel, tcolor in zip(ax.get_xticklabels(minor=True), [colors['city'], colors['fn_mean']]):
@@ -650,12 +659,11 @@ class FlatNormFixture(unittest.TestCase):
 
         # subtitle = ", ".join([t_str for t_name, t_str in titles.items() if t_name in which_titles])
         subtitle = ", ".join([titles[t_name] for t_name in which_titles])
-        title = f"{title}\n{subtitle}" if subtitle else title
+        title = f"{title}, {subtitle}" if subtitle else title
         ax.set_title(title, fontsize=kwargs.get('title_fontsize', 18))
 
         # plot config -------------------------------------------------------------
-        ax.set_xlabel(f"${FNN}$",
-                      # rotation='horizontal',
+        ax.set_xlabel(f"Normalized flat norm ${FNN}$",
                       fontsize=kwargs.get('xylabel_fontsize', 16))
 
         ax.set_ylim(bottom=0, top=hist_data[0].max() + 1)
@@ -787,10 +795,10 @@ class FlatNormFixture(unittest.TestCase):
 
         # ticks -------------------------------------------------------------------
         ax.set_xticks([city_ratio], [f"{city_ratio:0.3g}"], color=colors['city'], 
-                      minor=True, )
+                      minor=True, fontsize=15)
         ax.set_yticks([city_fn, fn_mean],
                       labels=[f"{city_fn:0.3g}", f"{fn_mean:0.3g}"],
-                      minor=True,
+                      minor=True, fontsize=15,
                       )
 
         for tlabel, tcolor in zip(ax.get_yticklabels(minor=True), [colors['city'], colors['fn_mean']]):
@@ -820,14 +828,14 @@ class FlatNormFixture(unittest.TestCase):
         subtitle = ", ".join([titles[t_name] for t_name in which_titles])
         # title = f"{title}\n{subtitle}"
         title = f"{subtitle}"
-        ax.set_title(title, fontsize=kwargs.get('title_fontsize', 25))
+        ax.set_title(title, fontsize=kwargs.get('title_fontsize', 30))
 
         # plot config -------------------------------------------------------------
-        ax.set_xlabel("$Ratio |T|/\\epsilon$", 
-                      fontsize=kwargs.get('xylabel_fontsize', 20))
+        ax.set_xlabel(f"Ratio $|T|/\\epsilon$", 
+                      fontsize=kwargs.get('xylabel_fontsize', 22))
         ax.set_ylabel(f"Normalized flat norm ${FNN}$",
                       rotation=kwargs.get('y_label_rotation', 'vertical'),
-                      fontsize=kwargs.get('xylabel_fontsize', 20))
+                      fontsize=kwargs.get('xylabel_fontsize', 22))
         ax.set_xlim(left=0, right=1)
         ax.set_ylim(bottom=0, top=1.05)
         return stat_dict
