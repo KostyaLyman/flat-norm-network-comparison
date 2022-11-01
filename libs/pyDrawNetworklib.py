@@ -302,6 +302,8 @@ def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
 def plot_regions(act_geom, syn_geom, geom_regions, ax,  **kwargs):
     highlight = kwargs.get('region_highlight', None)
     highlight = kwargs.get('highlight', highlight)
+    legendsize = kwargs.get('legend_fontsize',25)
+    legmarkscale = kwargs.get('legend_markerscale',2.5)
     plot_colors = dict(
         region=kwargs.get('region_color', 'cyan'),
         highlight=kwargs.get('highlight_color', 'orange')
@@ -317,11 +319,12 @@ def plot_regions(act_geom, syn_geom, geom_regions, ax,  **kwargs):
     draw_points(ax, geom2_vertices, color='blue', size=10, alpha=1.0, marker='o')
     draw_lines(ax, geom2_segments, color='blue', width=1.0, style='solid', alpha=1.0,
                directed=False, label='Synthetic Network')
-    ax.legend(fontsize=18, markerscale=2)
+    ax.legend(fontsize=legendsize, markerscale=legmarkscale)
     if highlight is not None:
         geom_regions = geom_regions[:]
         region = geom_regions.pop(highlight)
-        draw_polygons(ax, [region], color=plot_colors['highlight'], alpha=0.2, label=None)
+        draw_polygons(ax, [region], color=plot_colors['highlight'], 
+                      alpha=0.2, label=None)
 
     draw_polygons(ax, geom_regions, color=plot_colors['region'], alpha=0.2, label=None)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)

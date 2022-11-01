@@ -8,6 +8,7 @@ Created on Wed Oct 26 13:34:45 2022
 import sys, os
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import pandas as pd
 
 workpath = os.getcwd()
@@ -34,12 +35,12 @@ CITY = lambda x: f"{{\\bf {area_name[x]}}}"
 fx = FlatNormFixture('runTest')
 fx.fig_dir = "figs/areas"
 fx.out_dir = "out/areas"
-fx.area = 'patrick_henry'
+# fx.area = 'patrick_henry'
+fx.area = 'mcbryde'
 
 num_regions = 50
 lambda_ = 1000
 
-highlight_type_list = ["min","near","max"]
 
 
 flatnorm_df, fn_city_df, city_ratio = fx.read_stats(
@@ -49,71 +50,77 @@ flatnorm_df, fn_city_df, city_ratio = fx.read_stats(
 )
 
 #%% Plot the location statistics
-for highlight_type in highlight_type_list:
-    fig, axd = plt.subplot_mosaic(
-        [
-            ['scatter', 'scatter', 'city', 'city', 'city'],
-            ['t1', 't2', 't3', 't4', 't5'],
-            ['r1', 'r2', 'r3', 'r4', 'r5'],
-        ],
-        figsize=(25, 16), constrained_layout=True,
-        # width_ratios=[2, 2, 2, 2, 2],
-        gridspec_kw={'wspace': 0.05,
-                     'width_ratios':[2, 2, 2, 2, 2]}
-    )
-    
-    
-    idx = pd.IndexSlice
-    fn_df_lambda = flatnorm_df.loc[idx[:, lambda_], ].copy()
-    
-    
-    if highlight_type == "max":
-        selected_regions_ids = fn_df_lambda \
-            .sort_values(by='flatnorms', ascending=False)['id'] \
-            .to_list()[:5]
-        detail = f"Local regions with high normalized flat norm $\ {FNN}$"
-        fname = "max_fn"
-    
-    elif highlight_type == "near":
-        city_ratio = fn_city_df['input_ratios'].max()
-        fn_df_lambda['to_city'] = abs(fn_df_lambda['input_ratios'] - city_ratio)
-        selected_regions_ids = fn_df_lambda \
-            .sort_values(by='to_city', ascending=True)['id'] \
-            .to_list()[:5]
-        detail = f"$(|T|/\\epsilon, {FNN})$ values close to global value $(|T_{{G}}|/\\epsilon_{{G}}, {FNC})$"
-        fname = "near_fn"
-    
-    elif highlight_type == "min":
-        selected_regions_ids = fn_df_lambda \
-                .sort_values(by='flatnorms', ascending=True)['id'] \
-                .to_list()[:5]
-        detail = f"Local regions with small normalized flat norm $\ {FNN}$"
-        fname = "min_fn"
-    
-    else:
-        raise ValueError(f"Invalid highlight type {highlight_type}")
-        sys.exit(0)
-    
-    # Plot the regions
-    fx.plot_selected_regions(
-        selected_regions_ids, flatnorm_df, fn_city_df, lambda_,
-        axd=axd,
-        axtr=[axd['t1'], axd['t2'], axd['t3'], axd['t4'], axd['t5']],
-        axfn=[axd['r1'], axd['r2'], axd['r3'], axd['r4'], axd['r5'], ],
-        highlight_size=16**2, city_size=18**2,
-        region_alpha=0.4,
-        highlight_color='xkcd:violet',
-        reg_line=True, titles=['fn', 'corr', 'r2'], fontsize=25,
-        # reg_line=False, titles=['fn'], fontsize=25,
-    )
-    
-    # fname = fname + "_noregline"
-    
-    city_suptitle = f"${CITY(fx.area)}$ : {detail} : $\\lambda = {lambda_:d}$"
-    fig.suptitle(f"{city_suptitle}", fontsize=35)
-    
-    file_name = f"{fx.area}-R{num_regions}-{fname}"
-    
-    close_fig(fig, to_file=f"{fx.fig_dir}/{file_name}.png", show=True)
+
+fig, axd = plt.subplot_mosaic(
+    [
+        ['scatter', 'scatter', 'scatter', 'city', 'city', 'city'],
+        ['t11', 'r11', 't12', 'r12', 't13', 'r13'],
+        ['t21', 'r21', 't22', 'r22', 't23', 'r23'],
+        ['t31', 'r31', 't32', 'r32', 't33', 'r33'],
+    ],
+    figsize=(28, 28), constrained_layout=True,
+    # width_ratios=[2, 2, 2, 2, 2],
+    gridspec_kw={'wspace': 0.05,
+                 'width_ratios':[2, 2, 2, 2, 2, 2]}
+)
+
+
+idx = pd.IndexSlice
+fn_df_lambda = flatnorm_df.loc[idx[:, lambda_], ].copy()
+
+
+max_regions_ids = fn_df_lambda \
+    .sort_values(by='flatnorms', ascending=False)['id'] \
+    .to_list()[:3]
+
+
+city_ratio = fn_city_df['input_ratios'].max()
+fn_df_lambda['to_city'] = abs(fn_df_lambda['input_ratios'] - city_ratio)
+near_regions_ids = fn_df_lambda \
+    .sort_values(by='to_city', ascending=True)['id'] \
+    .to_list()[:3]
+
+min_regions_ids = fn_df_lambda \
+        .sort_values(by='flatnorms', ascending=True)['id'] \
+        .to_list()[:3]
+
+# Plot the regions
+all_regions_ids = min_regions_ids + max_regions_ids + near_regions_ids
+
+colors = ['xkcd:aqua', 'xkcd:violet', 'xkcd:tan']
+markers = ['D','^','P']
+leglabels = [f"Minimum ${FNN}$", f"Maximum ${FNN}$", 
+             f"$(|T|/\\epsilon,{FNN})$ near $(|T_G|/\\epsilon_G,{FNC})$"]
+leghandles = [Line2D([], [], marker=markers[i], 
+                     label=leglabels[i], markerfacecolor=colors[i],
+                     color='white') for i in range(len(colors))]
+
+fx.plot_selected_regions(
+    all_regions_ids, flatnorm_df, fn_city_df, lambda_,
+    axd=axd,
+    axtr=[axd['t11'], axd['t12'], axd['t13'],
+          axd['t21'], axd['t22'], axd['t23'],
+          axd['t31'], axd['t32'], axd['t33'],],
+    axfn=[axd['r11'], axd['r12'], axd['r13'],
+          axd['r21'], axd['r22'], axd['r23'],
+          axd['r31'], axd['r32'], axd['r33'],],
+    highlight_size=16**2, city_size=18**2,
+    region_alpha=0.6,
+    highlight_color=np.repeat(colors, 3), 
+    highlight_marker=np.repeat(markers, 3),
+    highlight_legend = leghandles,
+    # reg_line=True, titles=['fn', 'corr', 'r2'], fontsize=25,
+    reg_line=False, titles=['fn'], fontsize=30, xylabel_fontsize=25
+)
+
+fname = "noregline"
+
+prefix = "Flat norm computation for local regions in"
+city_suptitle = f"${CITY(fx.area)}$ : $\\lambda = {lambda_:d}$"
+# fig.suptitle(f"{city_suptitle}", fontsize=35)
+
+file_name = f"{fx.area}-R{num_regions}-{fname}"
+
+close_fig(fig, to_file=f"{fx.fig_dir}/{file_name}.png", show=True)
 
 

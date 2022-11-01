@@ -409,7 +409,6 @@ class FlatNormFixture(unittest.TestCase):
         """
         verbose = kwargs.setdefault('verbose', False)
         plot = kwargs.get('plot', False)
-        # old_impl = kwargs.get('old_impl', False)
         
         # compute triangulation and currents
         if not D:
@@ -512,11 +511,12 @@ class FlatNormFixture(unittest.TestCase):
         region = kwargs.get('region', None)
 
         # ---- PLOT ----
-        fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
+        # fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
         # fnorm_title = f"Flat norm scale, $\\lambda$ = {lambda_:d}" if not fnorm \
         #     else f"$\\lambda = {lambda_:d}$, ${FNN}={fnorm:0.3g}$"
 
         if not fnorm_only:
+            fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
             plot_triangulation(triangulated, T1, T2, axs[0], 
                                region_bound=region, legend=True)
             # axs[0].set_title(f"$\\epsilon = {epsilon}$", fontsize=fontsize)
@@ -524,8 +524,9 @@ class FlatNormFixture(unittest.TestCase):
             plot_norm(triangulated, echain, tchain, axs[1], region_bound=region)
             # axs[1].set_title(fnorm_title, fontsize=fontsize)
         else:
+            fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 1), **kwargs)
             plot_norm(triangulated, echain, tchain, axs, 
-                      region_bound=region, legend=True)
+                      region_bound=region)
             # axs.set_title(fnorm_title, fontsize=fontsize)
 
         if no_ax:
@@ -646,12 +647,13 @@ class FlatNormFixture(unittest.TestCase):
         which_titles = kwargs.get('titles', list(titles.keys()))
 
         title_styles = dict(
+            ee=f"$\\epsilon={{epsilon:0.4f}}$",
             ll=f"$\\lambda={{lambda_:d}}$",
             le=f"$\\lambda={{lambda_:d}}$, $\\epsilon={{epsilon:0.4f}}$",
             el=f"$\\epsilon={{epsilon:0.4f}}$, $\\lambda={{lambda_:d}}$",
         )
         title_style = kwargs.get('title_style', 'le')
-
+            
         if epsilon:
             title = title_styles[title_style].format(lambda_=lambda_, epsilon=epsilon)
         else:
@@ -663,8 +665,8 @@ class FlatNormFixture(unittest.TestCase):
         ax.set_title(title, fontsize=kwargs.get('title_fontsize', 18))
 
         # plot config -------------------------------------------------------------
-        ax.set_xlabel(f"Normalized flat norm ${FNN}$",
-                      fontsize=kwargs.get('xylabel_fontsize', 16))
+        # ax.set_xlabel(f"Normalized flat norm ${FNN}$",
+        #               fontsize=kwargs.get('xylabel_fontsize', 16))
 
         ax.set_ylim(bottom=0, top=hist_data[0].max() + 1)
         ax.set_xlim(left=-0.02, right=1.02)
@@ -716,16 +718,34 @@ class FlatNormFixture(unittest.TestCase):
             c=colors['scatter'],
             marker='o'
         )
-
+        
         if highlight:
-            ax.scatter(
-                fn_df.loc[fn_df['id'].isin(highlight), 'input_ratios'],
-                fn_df.loc[fn_df['id'].isin(highlight), 'flatnorms'],
-                alpha=0.8,
-                c=colors['highlight'],
-                s=kwargs.get('highlight_size', 12 ** 2),
-                marker=kwargs.get('highlight_marker', 'x'),
-            )
+            if isinstance(colors['highlight'],(list,set,np.ndarray)):
+                markers = kwargs.get('highlight_marker', 'x')
+                if isinstance(markers,str):
+                    markers = [markers]*len(colors['highlight'])
+                for i in range(len(colors['highlight'])):
+                    ax.scatter(
+                        fn_df.loc[fn_df['id'] == highlight[i], 'input_ratios'],
+                        fn_df.loc[fn_df['id'] == highlight[i], 'flatnorms'],
+                        alpha=0.8,
+                        c=colors['highlight'][i],
+                        s=kwargs.get('highlight_size', 12 ** 2),
+                        marker=markers[i]
+                    )
+                ax.legend(handles = kwargs.get('highlight_legend', []),
+                          loc='upper right',
+                          fontsize=kwargs.get('legend_fontsize', 25), 
+                          markerscale=4)
+            else:
+                ax.scatter(
+                    fn_df.loc[fn_df['id'].isin(highlight), 'input_ratios'],
+                    fn_df.loc[fn_df['id'].isin(highlight), 'flatnorms'],
+                    alpha=0.8,
+                    c=colors['highlight'],
+                    s=kwargs.get('highlight_size', 12 ** 2),
+                    marker=kwargs.get('highlight_marker', 'x'),
+                )
 
         # mean line ---------------------------------------------------------------
         fn_mean = y_flatnorms.mean()
@@ -879,7 +899,7 @@ class FlatNormFixture(unittest.TestCase):
             highlight=region_ids,
             **kwargs
         )
-
+        
         # PLOT REGIONS AND CITY ---------------------------------------------------------
         act_geom, synt_geom, hull = kwargs.get('geometries', (None, None, None))
         if act_geom is None:
@@ -902,7 +922,7 @@ class FlatNormFixture(unittest.TestCase):
             do_return=False, show=False,
             **kwargs
         )
-
+        
         # PLOT SELECTED REGIONS ---------------------------------------------------------
         if axfn or axtr:
             # which_titles = kwargs.get('region_titles', ['epsilon', 'ratio', 'fn'])
@@ -927,7 +947,7 @@ class FlatNormFixture(unittest.TestCase):
                     axtr[r].set_title(title, fontsize=fontsize)
                 else:
                     if axtr:
-                        which_titles = kwargs.get('region_titles', ['epsilon', 'ratio'])
+                        which_titles = kwargs.get('region_titles', ['ratio'])
                         title = ", ".join([titles[t_name] for t_name in which_titles])
                         plot_triangulation(D["triangulated"], T1, T2, axtr[r], 
                                            region_bound = region)

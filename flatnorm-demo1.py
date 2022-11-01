@@ -23,12 +23,14 @@ sys.path.append(libpath)
 rootpath = os.path.dirname(workpath)
 figpath = workpath + "/figs/"
 
+FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
+
 
 from pyFlatNormlib import get_geometry, get_current, msfn, perform_triangulation
 from pyDrawNetworklib import plot_norm, plot_input
 
 #%% Function
-def compute_flatnorm(in_geom, angle, ax1, ax2, lambda_ = 0.001):
+def compute_flatnorm(in_geom, angle, lambda_ = 0.001):
     in_geom_rot = [affinity.rotate(g, angle, (0,0)) for g in in_geom]
     # Construct the geometry list
     geom1 = []
@@ -42,39 +44,40 @@ def compute_flatnorm(in_geom, angle, ax1, ax2, lambda_ = 0.001):
     D = perform_triangulation(geom1,geom2,adj=1)
     T1 = get_current(D['triangulated'], D['actual'])
     T2 = get_current(D['triangulated'], D['synthetic'])
-    x,s,norm,_,_ = msfn(D['triangulated']['vertices'], 
+    x,s,norm,_,_,_ = msfn(D['triangulated']['vertices'], 
                         D['triangulated']['triangles'], 
                         D['triangulated']['edges'], 
                         T1-T2, lambda_,k=1)
     
     # Plot the result
+    fig = plt.figure(figsize=(13,6))
+    ax1 = fig.add_subplot(1,2,1)
+    ax2 = fig.add_subplot(1,2,2)
+    
     ax1 = plot_input(geom1,geom2,ax1)
-    ax1.set_title("Angle between geometries = "+'%.1f'%angle, fontsize=20)
     ax1.set_xlim(-1.1,1.1)
     ax1.set_ylim(-1.1,1.1)
     ax2 = plot_norm(D["triangulated"],x,s,ax2)
-    ax2.set_title("Computed flat norm = "+'%.2f'%norm, fontsize=20)
     ax2.set_xlim(-1.1,1.1)
     ax2.set_ylim(-1.1,1.1)
-    return
+    
+    title1 = f"Angle= {angle : 0.1f} degrees"
+    title2 = f"Flat norm ${FN}$= {norm : 0.2f}"
+    suptitle = f"{title1} : {title2}"
+    fig.suptitle(suptitle, fontsize=33)
+    return fig
 
 #%% Main code
 
 anglist = [90,60,30,15]
-nrows = 2
-ncols = len(anglist)
 
-fig = plt.figure(figsize=(ncols*8,nrows*6))
 filename = 'testnorm'
 
 in_geom1 = [LineString((Point(-1,0),Point(1,0)))]
 for i,ang in enumerate(anglist):
-    ax1 = fig.add_subplot(nrows,ncols,i+1)
-    ax2 = fig.add_subplot(nrows,ncols,i+1+ncols)
-    compute_flatnorm(in_geom1, ang, ax1, ax2)
-
-
-fig.savefig(figpath+filename+'.png',bbox_inches='tight')
+    fig = compute_flatnorm(in_geom1, ang)
+    fig.savefig(f"{figpath}{filename}-{i+1}.png",bbox_inches='tight')
+    
 
 
 
