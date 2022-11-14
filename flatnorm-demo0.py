@@ -80,4 +80,4 @@ fig = plt.figure(figsize=(16,12))
 ax = fig.add_subplot(211)
 ax = plot_demo_flatnorm(line,tri_struct,x,s,ax,offset=2)
 filename = 'demo-0'
-fig.savefig(workpath+'/figs/'+filename+'.png',bbox_inches='tight')
+fig.savefig(workpath+'/figs/demo/'+filename+'.png',bbox_inches='tight')

@@ -60,7 +60,7 @@ D, T1, T2 = fx.get_triangulated_currents(city_region, act_geom, synt_geom)
 
 
 #%% Run for different lambdas
-for lambda_ in [1000, 50000, 100000]:
+for lambda_ in [1000, 50000, 100000][:1]:
     norm, enorm, tnorm, w, plot_data = fx.compute_region_flatnorm(
         D = D, T1=T1, T2=T2,
         lambda_=lambda_,
@@ -72,14 +72,14 @@ for lambda_ in [1000, 50000, 100000]:
 
 
     # plot city flat norm
+    R = 6378
+    norm = norm * R
     fig, ax = fx.plot_triangulated_region_flatnorm(
         epsilon=f"{epsilon:0.4f}", lambda_=lambda_,
         fnorm_only=True,
         to_file = f"{fx.area}-{lambda_}-flatnorm_city",
         suptitle = f"Scale, $\\lambda$ = {lambda_}  :  "
-                    f"Flat norm, ${FN}$={norm:0.5f}",
-                    # f"${FNN}$={norm:0.5f} : "
-                     # f"|T| / $\\epsilon$ = {w / epsilon:0.5f}",
+                    f"Flat norm, ${FN}$ = {norm:0.3f} km",
         do_return=True,
         constrained_layout=True,
         figsize=(26,16), fontsize=60,
@@ -115,6 +115,8 @@ for lambda_ in np.linspace(1000,100000,100):
 
 
         # plot city flat norm
+        R = 6378
+        norm = norm * R
         fig, ax = fx.plot_triangulated_region_flatnorm(
             epsilon=f"{epsilon:0.4f}", lambda_=lambda_,
             fnorm_only=True,

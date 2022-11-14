@@ -10,32 +10,11 @@ the noldor database with required credentials.
 
 from __future__ import print_function
 
-import numpy as np
-import pandas as pd
+
 import geopandas as gpd
 import networkx as nx
-from shapely.geometry import LineString,Point
-from collections import namedtuple as nt
+from shapely.geometry import Point
 from libs.pyGeometrylib import Link
-
-
-
-
-
-def GetHomes(path,fis):
-    '''
-    '''
-    df_home = pd.read_csv(path+'load/'+fis+'-home-load.csv')
-    df_home['average'] = pd.Series(np.mean(df_home.iloc[:,3:27].values,axis=1))
-    df_home['peak'] = pd.Series(np.max(df_home.iloc[:,3:27].values,axis=1))
-    
-    home = nt("home",field_names=["cord","profile","peak","average"])
-    dict_load = df_home.iloc[:,[0]+list(range(3,27))].set_index('hid').T.to_dict('list')
-    dict_cord = df_home.iloc[:,0:3].set_index('hid').T.to_dict('list')
-    dict_peak = dict(zip(df_home.hid,df_home.peak))
-    dict_avg = dict(zip(df_home.hid,df_home.average))
-    homes = home(cord=dict_cord,profile=dict_load,peak=dict_peak,average=dict_avg)
-    return homes
 
 
 #%% Get output synthetic networks (output of Step 2)

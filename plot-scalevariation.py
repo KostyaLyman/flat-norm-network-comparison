@@ -19,6 +19,8 @@ from matplotlib.lines import Line2D
 import networkx as nx
 
 
+FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
+
 workpath = os.getcwd()
 libpath = workpath + "/libs/"
 sys.path.append(libpath)
@@ -42,23 +44,25 @@ ax.plot(df.lambda_,df.norm1*R,
         color='red',marker='^',
         markersize=3,linestyle='solid')
 
-ax.set_xlabel("Scale for flat norm",fontsize=20)
-ax.set_ylabel("Scaled simplicial flat norm (km)",fontsize=20)
+ax.set_xlabel("Scale parameter $\\lambda$",fontsize=20)
+ax.set_ylabel(f"length component, flat norm ${FN}$ (km)",fontsize=20)
 
 ax_2 = ax.twinx()
 ax_2.plot(df.lambda_,df.norm2*R*R,
         color='blue',marker='o',
         markersize=3,linestyle='solid')
 
-ax_2.set_ylabel("Simplicial flat norm (sq.km.)",fontsize=20)
+ax_2.set_ylabel("area component (sq.km.)",fontsize=20)
 
-labels = ["Multi-scale simplicial flat norm","Length component",
-          "Surface area component"]
+labels = [f"flat norm: ${FN}(T)$",
+          "length component: $T-\\partial S$",
+          "area component: $S$"]
 colors = ["black","red","blue"]
 markers = ["D","^","o"]
 han = [Line2D([0], [0], color=color, markerfacecolor=color, 
                marker=mark,markersize=10,label=label) \
               for label, color, mark in zip(labels, colors, markers)]
 
-ax.legend(handles=han,ncol=1,prop={'size': 15},loc='upper center')
+ax.legend(handles=han,ncol=1,prop={'size': 17},loc='upper center',
+          bbox_to_anchor=(0.32, 1))
 fig.savefig(workpath+'/figs/scale-variation.png',bbox_inches='tight')

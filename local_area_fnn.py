@@ -35,8 +35,8 @@ CITY = lambda x: f"{{\\bf {area_name[x]}}}"
 fx = FlatNormFixture('runTest')
 fx.fig_dir = "figs/areas"
 fx.out_dir = "out/areas"
-# fx.area = 'patrick_henry'
-fx.area = 'mcbryde'
+fx.area = 'patrick_henry'
+# fx.area = 'mcbryde'
 
 num_regions = 50
 lambda_ = 1000
@@ -58,7 +58,7 @@ fig, axd = plt.subplot_mosaic(
         ['t21', 'r21', 't22', 'r22', 't23', 'r23'],
         ['t31', 'r31', 't32', 'r32', 't33', 'r33'],
     ],
-    figsize=(28, 28), constrained_layout=True,
+    figsize=(24, 24), constrained_layout=True,
     # width_ratios=[2, 2, 2, 2, 2],
     gridspec_kw={'wspace': 0.05,
                  'width_ratios':[2, 2, 2, 2, 2, 2]}

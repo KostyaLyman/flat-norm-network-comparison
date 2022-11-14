@@ -189,35 +189,10 @@ class FlatNormFixture(unittest.TestCase):
         if not area:
             area = self.area
 
-        # # Actual network
+        # Actual network
         act_geom, hull = self.read_actual_network(area)
-        # act_edges_file = f"{self.act_path}/{area}/{area}_edges.shp"
-        # if not os.path.exists(act_edges_file):
-        #     raise ValueError(f"{act_edges_file} doesn't exist!")
-        #
-        # df_act = gpd.read_file(act_edges_file)
-        # act_geom = []
-        # for i in range(len(df_act)):
-        #     act_geom.extend(get_geometry(df_act['geometry'][i]))
-        #
-        # # Get convex hull of the region
-        # act_lines = MultiLineString(act_geom)
-        # hull = act_lines.convex_hull.buffer(5e-4)
-
+        
         # Synthetic network
-        # synt_net = GetDistNet(self.synt_path, self.area_codes[area])
-        #
-        # # Get the synthetic network edges in the region
-        # synt_nodes = [
-        #     n for n in synt_net.nodes
-        #     if Point(synt_net.nodes[n]['cord']).within(hull)
-        #        and synt_net.nodes[n]['label'] != 'H'
-        # ]
-        # synt_graph = nx.subgraph(synt_net, synt_nodes)
-        # synt_geom = []
-        # for e in synt_graph.edges:
-        #     synt_geom.extend(get_geometry(synt_net.edges[e]['geometry']))
-
         synt_geom = self.read_synthetic_network(area=area, hull=hull)
 
         return act_geom, synt_geom, hull
@@ -501,7 +476,7 @@ class FlatNormFixture(unittest.TestCase):
             self, triangulated, T1, T2,
             echain, tchain,
             epsilon, lambda_,
-            fnorm=None, fnorm_only=False,
+            fnorm=None, fnorm_only=False, with_input = False,
             ax=None, to_file=None, show=True,
             **kwargs
     ):
@@ -514,20 +489,36 @@ class FlatNormFixture(unittest.TestCase):
         # fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
         # fnorm_title = f"Flat norm scale, $\\lambda$ = {lambda_:d}" if not fnorm \
         #     else f"$\\lambda = {lambda_:d}$, ${FNN}={fnorm:0.3g}$"
-
-        if not fnorm_only:
-            fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
-            plot_triangulation(triangulated, T1, T2, axs[0], 
-                               region_bound=region, legend=True)
-            # axs[0].set_title(f"$\\epsilon = {epsilon}$", fontsize=fontsize)
-
-            plot_norm(triangulated, echain, tchain, axs[1], region_bound=region)
-            # axs[1].set_title(fnorm_title, fontsize=fontsize)
+        if with_input:
+            if not fnorm_only:
+                fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 3), **kwargs)
+                plot_triangulation(triangulated, T1, T2, axs[0], 
+                                   show_triangulation=False, 
+                                   region_bound=region, legend=True)
+                plot_triangulation(triangulated, T1, T2, axs[1], 
+                                   region_bound=region)
+                plot_norm(triangulated, echain, tchain, axs[2], 
+                          region_bound=region)
+            else:
+                fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
+                plot_triangulation(triangulated, T1, T2, axs[0], 
+                                   show_triangulation=False, 
+                                   region_bound=region, legend=True)
+                plot_norm(triangulated, echain, tchain, axs[1], 
+                          region_bound=region)
         else:
-            fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 1), **kwargs)
-            plot_norm(triangulated, echain, tchain, axs, 
-                      region_bound=region)
-            # axs.set_title(fnorm_title, fontsize=fontsize)
+            if not fnorm_only:
+                fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
+                plot_triangulation(triangulated, T1, T2, axs[0], 
+                                   region_bound=region, legend=True)
+                # axs[0].set_title(f"$\\epsilon = {epsilon}$", fontsize=fontsize)
+    
+                plot_norm(triangulated, echain, tchain, axs[1], region_bound=region)
+                # axs[1].set_title(fnorm_title, fontsize=fontsize)
+            else:
+                fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 1), **kwargs)
+                plot_norm(triangulated, echain, tchain, axs, 
+                          region_bound=region)
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"

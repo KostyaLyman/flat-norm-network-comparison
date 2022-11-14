@@ -9,16 +9,10 @@ networks inside it.
 """
 
 import sys, os
-from matplotlib import pyplot as plt, axes
-from timeit import default_timer as timer
-from datetime import timedelta
-import numpy as np
-import pandas as pd
-import csv
+from shapely.geometry import Point
 
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
-# FNN = NORMALIZED_FLAT_NORM = "\\tilde{{\\mathbb{{F}}}}_{{\\lambda}}"
 FNN = NORMALIZED_FLAT_NORM = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}"
 
 
@@ -26,7 +20,7 @@ workpath = os.getcwd()
 sys.path.append(workpath+'/libs/')
 
 from pyFlatNormFixture import FlatNormFixture
-from pyDrawNetworklib import get_vertseg_geometry
+from pyFlatNormlib import get_structure
 
 
 # get fixture
@@ -39,14 +33,8 @@ fx.fig_dir = "figs/test"
 # read geometries
 area = 'mcbryde'
 act_geom, synt_geom, hull = fx.read_networks(area)
-verts,_ = get_vertseg_geometry(act_geom)
+struct = get_structure(act_geom)
 
-# compute stats
-flatnorm_data = {
-    'epsilons': [], 'lambdas': [], 'flatnorms': [],
-    'norm_lengths': [], 'norm_areas': [],
-    'input_lengths': [], 'input_ratios': [],
-}
 
 # label defnitions
 ind_label = {
@@ -94,7 +82,8 @@ epsilon = 1e-3
 lambda_ = 1000
 
 for ind in ind_label:
-    compute_flat_norm_region(ind, verts[ind],epsilon,lambda_)
+    pt = Point(struct["vertices"][ind])
+    compute_flat_norm_region(ind, pt, epsilon, lambda_)
 
 
 

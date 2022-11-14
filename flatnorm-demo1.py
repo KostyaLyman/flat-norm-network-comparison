@@ -19,9 +19,7 @@ from shapely import affinity
 workpath = os.getcwd()
 libpath = workpath + "/libs/"
 sys.path.append(libpath)
-
-rootpath = os.path.dirname(workpath)
-figpath = workpath + "/figs/"
+figpath = workpath + "/figs/demo/"
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
 
@@ -78,6 +76,26 @@ for i,ang in enumerate(anglist):
     fig = compute_flatnorm(in_geom1, ang)
     fig.savefig(f"{figpath}{filename}-{i+1}.png",bbox_inches='tight')
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -267,6 +267,7 @@ def plot_input(act_geom, syn_geom, ax):
 
 
 def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
+    show_tri = kwargs.get('show_triangulation', True)
     geom_vertices = [Point(v) for v in tri_struct['vertices'].tolist()]
     geom_subsimplices = [LineString((tri_struct['vertices'][c[0]],
                                      tri_struct['vertices'][c[1]])) \
@@ -275,9 +276,15 @@ def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
     geom_segment1 = [geom_subsimplices[i] for i, t in enumerate(t1) if t != 0]
     geom_segment2 = [geom_subsimplices[i] for i, t in enumerate(t2) if t != 0]
 
-    draw_points(ax, geom_vertices, color='black', size=20, alpha=0.5, marker='o')
-    draw_lines(ax, geom_subsimplices, color='black', width=0.5, style='dashed',
-               alpha=0.2, directed=False)
+    
+    if show_tri:
+        draw_points(ax, geom_vertices, color='black', 
+                    size=20, alpha=0.5, marker='o')
+        draw_lines(ax, geom_subsimplices, color='black', width=0.5, 
+                   style='dashed',alpha=0.2, directed=False)
+    else:
+        draw_lines(ax, geom_subsimplices, color='white', width=0.5, 
+                   style='dashed',alpha=0.2, directed=False)
     draw_lines(ax, geom_segment1, color='red', width=2.0, style='solid',
                alpha=1.0, directed=False,label='Actual network')
     draw_lines(ax, geom_segment2, color='blue', width=2.0, style='solid',
@@ -295,7 +302,7 @@ def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
     # ---- legend for figure ----
     legend = kwargs.get('legend', False)
     if legend:
-        ax.legend(fontsize=20, markerscale=2.5, loc="upper left")
+        ax.legend(fontsize=22, markerscale=2.5, loc="lower right")
     return ax
 
 
