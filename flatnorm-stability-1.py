@@ -36,9 +36,6 @@ fx.fig_dir = "figs/test"
 
 # read geometries
 area = 'mcbryde'
-act_geom, synth_geom, hull = fx.read_networks(area)
-struct = get_structure(act_geom)
-
 
 # label defnitions
 ind_label = {
@@ -46,6 +43,7 @@ ind_label = {
     1003:'ex2',
     967: 'ex3',
     930: 'ex4'}
+
 
 #%% Perturbations
 
@@ -78,6 +76,8 @@ def variant_geometry(geometry, radius=10, N=1):
     return new_geom
 
 #%% compute flat norm
+act_geom, synth_geom, hull = fx.read_networks(area)
+struct = get_structure(act_geom)
 
 # parameters
 num_networks = 100
@@ -95,7 +95,7 @@ flatnorm_stability_data = {
 # Construct perturbed synthetic network
 for rad in radius_list:
     sgeom_list = variant_geometry(synth_geom, radius=rad, N=num_networks)
-    # compute flat norm and append to statistics disctionary
+    # compute flat norm and append to statistics dictionary
     for ind in ind_label:
         point = Point(struct["vertices"][ind])
         region = fx.get_region(point, epsilon)

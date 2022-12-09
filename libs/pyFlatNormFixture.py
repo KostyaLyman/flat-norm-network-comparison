@@ -24,6 +24,7 @@ import matplotlib.axes
 import networkx as nx
 import pandas as pd
 import seaborn as sns
+from sklearn.metrics import r2_score
 
 from libs.pyExtractDatalib import GetDistNet
 from libs.pyFlatNormlib import get_geometry, get_current, msfn, perform_triangulation
@@ -238,6 +239,44 @@ class FlatNormFixture(unittest.TestCase):
         city_ratio = fn_city_df['input_ratios'].max()
 
         return fn_stat_df, fn_city_df, city_ratio
+    
+    def read_stability_stats(self, stability_stat_file, original_stat_file, in_dir=None):
+        """
+        :param stability_stat_file: f"{fx.area}-FN_STAT_R{num_regions}"
+        :param fn_city_file: f"{fx.area}-FN_STAT_city"
+        :return: fn_df, city_df, city_ratio
+        """
+        if in_dir:
+            fn_stat_file = f"{in_dir}/{stability_stat_file}"
+            fn_index_file = f"{in_dir}/{original_stat_file}"
+
+        fn_stat_file = fn_stat_file if fn_stat_file.endswith(".csv") else f"{fn_stat_file}.csv"
+        fn_index_file = fn_index_file if fn_index_file.endswith(".csv") else f"{fn_index_file}.csv"
+        
+        fn_stat_df = pd.read_csv(
+            fn_stat_file,
+            sep=",",
+            dtype={
+                'radius': float,
+                'flatnorms': np.float64,
+                'input_ratios': np.float64,
+                'index':int,
+                'MIN_X': np.float64,
+                'MIN_Y': np.float64,
+                'MAX_X': np.float64,
+                'MAX_Y': np.float64,
+            }
+        )
+        fn_stat_df['id'] = list(range(len(fn_stat_df)))
+        fn_stat_df = fn_stat_df.set_index(['radius', 'index'], drop=False)
+        
+        fn_index_df = pd.read_csv(
+            fn_index_file,
+            sep=",",
+        )
+        fn_index_df = fn_index_df.set_index(['index'], drop=False)
+
+        return fn_stat_df, fn_index_df
 
     @staticmethod
     def get_region(point, epsilon=2e-3):
@@ -767,8 +806,6 @@ class FlatNormFixture(unittest.TestCase):
             )
 
         # regression line ---------------------------------------------------------
-        from sklearn.metrics import r2_score
-        # regression
         N = len(x_ratios)
         b, a = np.polyfit(x_ratios, y_flatnorms, deg=1)
         y_predict = a + b * x_ratios
@@ -959,5 +996,159 @@ class FlatNormFixture(unittest.TestCase):
                         axfn[r].set_title(title, fontsize=fontsize)
 
         return stats_data
+    
+    
+    def plot_stability_fn_vs_ratio(self, fn_df, fn_index_df, index, 
+                                   radius=None, ax=None, **kwargs):
+        """
+        :param kwargs: highlight: set, highlight_marker: str;
+                       highlight_size: int, scatter_size: int, index_size: int;
+                       titles: list, title_style: str;
+                       reg_line: bool, mean_line: bool, index_point: bool;
+                       y_label_rotation: str;
+                       X_color: str -- where X in {ind_region, scatter, highlight, fn_mean, regression}
+                       X_fontsize: int -- where X in {title, xylabel};
+                       if ax is None: figsize, constrained_layout
+        """
+        fig, ax, _ = get_fig_from_ax(ax, **kwargs)
 
-        # pass
+        colors = {
+            'ind_region': kwargs.get('index_color', 'xkcd:electric blue'),
+            'scatter': kwargs.get('scatter_color', 'xkcd:pastel blue'),
+            'highlight': kwargs.get('highlight_color', 'xkcd:pumpkin'),
+            'fn_mean': kwargs.get('fn_mean_color', 'xkcd:kelly green'),
+            'regression': kwargs.get('regression_color', 'red'),
+        }
+
+        # flatnorm VS ratios ------------------------------------------------------
+        if radius:
+            fn_df = fn_df.loc[(radius, index), ].copy()
+        else:
+            idx = pd.IndexSlice
+            fn_df = fn_df.loc[idx[:, index], ].copy()
+
+        x_ratios = fn_df['input_ratios'].to_numpy()
+        y_flatnorms = fn_df['flatnorms'].to_numpy()
+
+        ax.scatter(
+            x_ratios, y_flatnorms,
+            alpha=0.7,
+            s=kwargs.get('scatter_size', 5 ** 2),
+            c=colors['scatter'],
+            marker='o'
+        )
+        
+        # mean line ---------------------------------------------------------------
+        fn_mean = y_flatnorms.mean()
+        fn_sd = y_flatnorms.std()
+        if kwargs.get('mean_line', True):
+            ax.plot(
+                [0, 100], [fn_mean, fn_mean],
+                c=colors['fn_mean'], linewidth=3, alpha=0.5
+            )
+            ax.plot(
+                [0, 100], [fn_mean - fn_sd, fn_mean - fn_sd],
+                c=colors['fn_mean'], linewidth=1, linestyle=long_dashed, alpha=0.5,
+            )
+            ax.plot(
+                [0, 100], [fn_mean + fn_sd, fn_mean + fn_sd],
+                c=colors['fn_mean'], linewidth=1, linestyle=long_dashed, alpha=0.5,
+            )
+
+        # flatnorm for indexed region -----------------------------------------------------
+        index_fn, index_ratio = fn_index_df.loc[index, ['flatnorms', 'input_ratios']]
+        if kwargs.get('index_point', True):
+            ax.scatter(
+                [index_ratio], [index_fn],
+                alpha=1,
+                s=kwargs.get('index_size', 15 ** 2),
+                color=colors['ind_region'],
+                marker='*'
+            )
+        
+        # regression line ---------------------------------------------------------
+        N = len(x_ratios)
+        b, a = np.polyfit(x_ratios, y_flatnorms, deg=1)
+        y_predict = a + b * x_ratios
+        y_var = sum((y_predict - y_flatnorms) ** 2) / (N - 1)
+        y_err = math.sqrt(y_var)
+        b_var = y_var / sum((x_ratios - x_ratios.mean()) ** 2)
+        b_err = math.sqrt(b_var)
+        # correlation & R2
+        fn_ratio_corr = np.corrcoef(x_ratios, y_flatnorms)[0, 1]
+        fn_ratio_r2 = r2_score(y_flatnorms, y_predict)
+
+        if kwargs.get('reg_line', True):
+            xseq = np.linspace(0, 1, num=10)
+            ax.plot(xseq, a + b * xseq, color=colors['regression'], lw=3, alpha=0.5)
+            ax.plot(
+                xseq, a + y_err + b * xseq,
+                color=colors['regression'], lw=1, alpha=0.5, linestyle=long_dashed
+            )
+            ax.plot(
+                xseq, a - y_err + b * xseq,
+                color=colors['regression'], lw=1, alpha=0.5, linestyle=long_dashed
+            )
+
+        # # stat data dict ----------------------------------------------------------
+        # stat_dict = {
+        #     'a': a, 'b': b,
+        #     'err': math.sqrt(y_var),
+        #     'std_err': np.std(y_predict - y_flatnorms),
+        #     'b_err': b_err,
+        #     'corr': fn_ratio_corr,
+        #     'R2': fn_ratio_r2,
+        #     'fn_mean': fn_mean,
+        #     'fn_sd': fn_sd,
+        # }
+
+        # ticks -------------------------------------------------------------------
+        ax.set_xticks([index_ratio], [f"{index_ratio:0.3g}"], color=colors['ind_region'], 
+                      minor=True, fontsize=kwargs.get('tick_fontsize', 15))
+        ax.set_yticks([index_fn],
+                      labels=[f"{index_fn:0.3g}"],
+                      minor=True, fontsize=kwargs.get('tick_fontsize', 15))
+
+        for tlabel, tcolor in zip(ax.get_yticklabels(minor=True), 
+                                  [colors['ind_region'], colors['fn_mean']]):
+            tlabel.set_color(tcolor)
+        
+
+        # plot title --------------------------------------------------------------
+        titles = dict(
+            fn=f"${FNM}={fn_mean:0.3g} \pm {fn_sd:0.3g}$",
+            beta=f"$\\hat{{\\beta}}={b:0.3g} \pm {b_err:0.3g}$",
+            corr=f"$\\rho={fn_ratio_corr:0.3g}$",
+            r2=f"$R^{{2}}={fn_ratio_r2:0.3g}$",
+        )
+        which_titles = kwargs.get('titles', list(titles.keys()))
+
+        title_styles = dict(
+            ii=f"region index : ${{index:d}}$",
+            rr=f"max perturb : ${{radius:0.1f}}$ m",
+            ir=f"region index : ${{index:d}}$, max perturb : ${{radius:0.1f}}$ m",
+            ri=f"max perturb : ${{radius:0.1f}}$ m, region index : ${{index:d}}$",
+        )
+        title_style = kwargs.get('title_style', 'rr')
+        
+        
+        if radius:
+            title = title_styles[title_style].format(radius=radius, index=index)
+        else:
+            title = title_styles['ii'].format(index=index)
+
+        subtitle = ", ".join([titles[t_name] for t_name in which_titles])
+        title = f"{title} : {subtitle}"
+        ax.set_title(title, fontsize=kwargs.get('title_fontsize', 30))
+
+        # plot config -------------------------------------------------------------
+        ax.set_xlabel(f"Ratio $|T|/\\epsilon$", 
+                      fontsize=kwargs.get('xylabel_fontsize', 22))
+        ax.set_ylabel(f"Normalized flat norm ${FNN}$",
+                      rotation=kwargs.get('y_label_rotation', 'vertical'),
+                      fontsize=kwargs.get('xylabel_fontsize', 22))
+        ax.set_xlim(left=0, right=0.5)
+        ax.set_ylim(bottom=0, top=1.05)
+        return fn_mean, index_fn
+
+        

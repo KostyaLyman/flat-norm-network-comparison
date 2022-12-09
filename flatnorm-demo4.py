@@ -10,10 +10,13 @@ networks inside it.
 
 import sys, os
 from shapely.geometry import Point
+import pandas as pd
+import csv
 
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
 FNN = NORMALIZED_FLAT_NORM = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}"
+MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 
 
 workpath = os.getcwd()
@@ -73,7 +76,7 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
         do_return=False, show=True,
         **plot_data
         )
-    return
+    return norm, w
 
 #%% compute flat norm
 
@@ -81,10 +84,31 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
 epsilon = 1e-3
 lambda_ = 1000
 
+# compute stats
+flatnorm_data = {
+    'flatnorms': [], 'input_ratios': [], 'index': [],
+    'MIN_X': [], 'MIN_Y': [], 'MAX_X': [], 'MAX_Y': []
+}
+
 for ind in ind_label:
     pt = Point(struct["vertices"][ind])
-    compute_flat_norm_region(ind, pt, epsilon, lambda_)
+    region = fx.get_region(pt, epsilon)
+    norm, w = compute_flat_norm_region(ind, pt, epsilon, lambda_)
+    
+    # store the data
+    flatnorm_data['index'].append(ind)
+    flatnorm_data['flatnorms'].append(norm)
+    flatnorm_data['input_ratios'].append(w/epsilon)
+    region_bounds = region.exterior.bounds
+    flatnorm_data['MIN_X'].append(region_bounds[MIN_X])
+    flatnorm_data['MIN_Y'].append(region_bounds[MIN_Y])
+    flatnorm_data['MAX_X'].append(region_bounds[MAX_X])
+    flatnorm_data['MAX_Y'].append(region_bounds[MAX_Y])
+    
 
-
-
+df = pd.DataFrame(flatnorm_data)
+filename = f"{area}-FN_STAT_INDEX"
+with open(f"{fx.out_dir}/{filename}.csv", "w") as outfile:
+    df.to_csv(outfile, sep=",", index=False,
+              header=True, quoting=csv.QUOTE_NONNUMERIC)
 
