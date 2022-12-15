@@ -16,6 +16,7 @@ import csv
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
 FNN = NORMALIZED_FLAT_NORM = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}"
+HD = HAUSDORFF_DISTANCE = "\\mathbb{{D}}_{{Haus}}"
 MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 
 
@@ -57,6 +58,7 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
         act_geom, synt_geom,
         lambda_=lamb_,
         normalized=True,
+        compute_haus_dist=True,
         plot=True
     )
     
@@ -78,11 +80,21 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
         )
     return norm, w
 
+
+
 #%% compute flat norm
 
 # parameters
 epsilon = 1e-3
 lambda_ = 1000
+
+for ind in ind_label:
+    pt = Point(struct["vertices"][ind])
+    region = fx.get_region(pt, epsilon)
+    hd, w = compute_hausdorff_region(ind, pt, epsilon)
+
+
+sys.exit(0)
 
 # compute stats
 flatnorm_data = {

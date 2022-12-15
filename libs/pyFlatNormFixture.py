@@ -30,6 +30,7 @@ from libs.pyExtractDatalib import GetDistNet
 from libs.pyFlatNormlib import get_geometry, get_current, msfn, perform_triangulation
 from libs.pyDrawNetworklib import plot_norm, plot_intermediate_result, plot_input, plot_failed_triangulation
 from libs.pyDrawNetworklib import plot_regions, plot_triangulation
+from libs.pyHausdorfflib import compute_hausdorff, compute_length
 
 
 MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
@@ -369,6 +370,7 @@ class FlatNormFixture(unittest.TestCase):
             return region_list
 
         return point_list, region_list
+        
 
     def get_triangulated_currents(
             self, region, act_geom, synt_geom, **kwargs
@@ -415,6 +417,7 @@ class FlatNormFixture(unittest.TestCase):
             D=None, T1=None, T2=None,
             lambda_=1000,
             normalized=False,
+            compute_haus_dist = False,
             **kwargs
             # verbose=False, plot=False, old_impl=False
     ):
@@ -456,6 +459,22 @@ class FlatNormFixture(unittest.TestCase):
 
         if verbose:
             print("The computed simplicial flat norm is:", norm)
+        
+        if compute_haus_dist:
+            distance = kwargs.get("distance", "geodesic")
+            
+            # get the actual network edges in the region
+            reg_act_geom = [g for g in act_geom if g.intersects(region)]
+            reg_synt_geom = [g for g in synt_geom if g.intersects(region)]
+            
+            # --- Hausdorff distance ---
+            hd, hd_geom = compute_hausdorff(reg_act_geom, reg_synt_geom,
+                                            distance=distance)
+            if normalized:
+                hd = hd / input_length
+        else:
+            hd = None
+            hd_geom = None
 
         if plot:
             plot_data = dict(
@@ -464,11 +483,12 @@ class FlatNormFixture(unittest.TestCase):
                 T2=T2,
                 echain=x,
                 tchain=s,
-                region=region
+                region=region,
+                hd_geom = hd_geom,
             )
             return norm, enorm, tnorm, input_length, plot_data
 
-        return norm, enorm, tnorm, input_length
+        return norm, enorm, tnorm, input_length, hd
 
     def plot_regions_list(
             self,
@@ -515,7 +535,8 @@ class FlatNormFixture(unittest.TestCase):
             self, triangulated, T1, T2,
             echain, tchain,
             epsilon, lambda_,
-            fnorm=None, fnorm_only=False, with_input = False,
+            fnorm=None,
+            show_figs = ["input", "fn"],
             ax=None, to_file=None, show=True,
             **kwargs
     ):
@@ -523,41 +544,26 @@ class FlatNormFixture(unittest.TestCase):
         fontsize = kwargs.get('fontsize', 20)
         do_return = kwargs.get('do_return', False)
         region = kwargs.get('region', None)
+        hd_geom = kwargs.get("hd_geom",None)
 
         # ---- PLOT ----
         # fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
         # fnorm_title = f"Flat norm scale, $\\lambda$ = {lambda_:d}" if not fnorm \
         #     else f"$\\lambda = {lambda_:d}$, ${FNN}={fnorm:0.3g}$"
-        if with_input:
-            if not fnorm_only:
-                fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 3), **kwargs)
-                plot_triangulation(triangulated, T1, T2, axs[0], 
+        fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, len(show_figs)), **kwargs)
+        for i,figure in enumerate(show_figs):
+            if figure == "input":
+                plot_triangulation(triangulated, T1, T2, axs[i], 
                                    show_triangulation=False, 
                                    region_bound=region, legend=True)
-                plot_triangulation(triangulated, T1, T2, axs[1], 
-                                   region_bound=region)
-                plot_norm(triangulated, echain, tchain, axs[2], 
+            elif figure == "fn":
+                plot_norm(triangulated, echain, tchain, axs[i], 
                           region_bound=region)
-            else:
-                fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
-                plot_triangulation(triangulated, T1, T2, axs[0], 
+            elif figure == "haus":
+                plot_triangulation(triangulated, T1, T2, axs[i], 
                                    show_triangulation=False, 
+                                   hd_geom = hd_geom,
                                    region_bound=region, legend=True)
-                plot_norm(triangulated, echain, tchain, axs[1], 
-                          region_bound=region)
-        else:
-            if not fnorm_only:
-                fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
-                plot_triangulation(triangulated, T1, T2, axs[0], 
-                                   region_bound=region, legend=True)
-                # axs[0].set_title(f"$\\epsilon = {epsilon}$", fontsize=fontsize)
-    
-                plot_norm(triangulated, echain, tchain, axs[1], region_bound=region)
-                # axs[1].set_title(fnorm_title, fontsize=fontsize)
-            else:
-                fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 1), **kwargs)
-                plot_norm(triangulated, echain, tchain, axs, 
-                          region_bound=region)
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
@@ -571,6 +577,7 @@ class FlatNormFixture(unittest.TestCase):
         if do_return:
             return fig, axs
         pass
+    
 
     def plot_region_flatnorm_lines(
             self, epsilons, lambdas, flatnorms,

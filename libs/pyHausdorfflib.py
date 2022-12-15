@@ -40,10 +40,24 @@ def interpolate_points(geometry,sep=10):
         points.extend(new_points)
     return points
 
+def compute_length(geometry, distance="euclidean"):
+    if not isinstance(geometry, list):
+        geometry = [geometry]
+    if distance == "euclidean":
+        length = sum([geom.length for geom in geometry])
+    elif distance == "geodesic":
+        length = sum([geodist(geom.coords[0],geom.coords[1]) \
+                      for geom in geometry])
+    return length
 
-def compute_hausdorff(act_geom, synt_geom):
+
+def compute_hausdorff(act_geom, synt_geom, distance="euclidean"):
     act_geom_pts = interpolate_points(act_geom)
     synt_geom_pts = interpolate_points(synt_geom)
-    
-    hd,i,j,_,_,_ = hausdorff_(act_geom_pts,synt_geom_pts,distance=euclid_dist)
+    if distance == "euclidean":
+        hd,i,j,_,_,_ = hausdorff_(act_geom_pts,synt_geom_pts,
+                                  distance=euclid_dist)
+    elif distance == "geodesic":
+        hd,i,j,_,_,_ = hausdorff_(act_geom_pts,synt_geom_pts,
+                                  distance=geodist)
     return hd, LineString((Point(act_geom_pts[i]), Point(synt_geom_pts[j])))

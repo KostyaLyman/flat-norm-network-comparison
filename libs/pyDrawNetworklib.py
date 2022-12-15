@@ -266,6 +266,8 @@ def plot_input(act_geom, syn_geom, ax):
     return ax
 
 
+
+
 def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
     show_tri = kwargs.get('show_triangulation', True)
     geom_vertices = [Point(v) for v in tri_struct['vertices'].tolist()]
@@ -285,10 +287,21 @@ def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
     else:
         draw_lines(ax, geom_subsimplices, color='white', width=0.5, 
                    style='dashed',alpha=0.2, directed=False)
+    # Plot input network geometries
     draw_lines(ax, geom_segment1, color='red', width=2.0, style='solid',
                alpha=1.0, directed=False,label='Actual network')
     draw_lines(ax, geom_segment2, color='blue', width=2.0, style='solid',
                alpha=1.0, directed=False,label='Synthetic network')
+    
+    # Plot the hausdorff distance
+    hd_geom = kwargs.get("hd_geom", None)
+    if not hd_geom:
+        hd_vertices = [Point(c) for c in hd_geom.coords]
+        draw_points(ax, hd_vertices, color='green', size=20, 
+                    alpha=1.0, marker='o')
+        draw_lines(ax, hd_geom, color='green', width=2.0, 
+                   style='solid', alpha=1.0,
+                   directed=False, label='Hausdorff distance')
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
     
     # ---- region of fixed size ----
@@ -371,24 +384,6 @@ def plot_failed_triangulation(dict_struct):
     ax2 = fig.add_subplot(122)
     ax2 = plot_intermediate_result(struct, ax2)
     return fig
-
-def plot_hausdorff(tri_struct, t1, t2, geom_haus, ax):
-    geom_subsimplices = [LineString((tri_struct['vertices'][c[0]],
-                                     tri_struct['vertices'][c[1]])) \
-                         for c in tri_struct['edges']]
-
-    geom_segment1 = [geom_subsimplices[i] for i, t in enumerate(t1) if t != 0]
-    geom_segment2 = [geom_subsimplices[i] for i, t in enumerate(t2) if t != 0]
-
-    
-    draw_lines(ax, geom_segment1, color='red', width=1.0, style='solid',
-               alpha=0.5, directed=False)
-    draw_lines(ax, geom_segment2, color='blue', width=1.0, style='solid',
-               alpha=0.5, directed=False)
-    draw_lines(ax, geom_haus, color='green', width=2.5, style='solid',
-               alpha=1.0, directed=False)
-    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
-    return ax
 
 
 class PlotTest:
