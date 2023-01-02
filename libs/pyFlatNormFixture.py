@@ -417,7 +417,6 @@ class FlatNormFixture(unittest.TestCase):
             D=None, T1=None, T2=None,
             lambda_=1000,
             normalized=False,
-            compute_haus_dist = False,
             **kwargs
             # verbose=False, plot=False, old_impl=False
     ):
@@ -459,22 +458,6 @@ class FlatNormFixture(unittest.TestCase):
 
         if verbose:
             print("The computed simplicial flat norm is:", norm)
-        
-        if compute_haus_dist:
-            distance = kwargs.get("distance", "geodesic")
-            
-            # get the actual network edges in the region
-            reg_act_geom = [g for g in act_geom if g.intersects(region)]
-            reg_synt_geom = [g for g in synt_geom if g.intersects(region)]
-            
-            # --- Hausdorff distance ---
-            hd, hd_geom = compute_hausdorff(reg_act_geom, reg_synt_geom,
-                                            distance=distance)
-            if normalized:
-                hd = hd / input_length
-        else:
-            hd = None
-            hd_geom = None
 
         if plot:
             plot_data = dict(
@@ -484,11 +467,25 @@ class FlatNormFixture(unittest.TestCase):
                 echain=x,
                 tchain=s,
                 region=region,
-                hd_geom = hd_geom,
             )
             return norm, enorm, tnorm, input_length, plot_data
 
-        return norm, enorm, tnorm, input_length, hd
+        return norm, enorm, tnorm, input_length
+    
+    def compute_region_hausdorff(
+            self, region=None, act_geom=None, synt_geom=None, 
+            **kwargs
+            ):
+        distance = kwargs.get("distance", "euclidean")
+        
+        # get the actual network edges in the region
+        reg_act_geom = [g for g in act_geom if g.intersects(region)]
+        reg_synt_geom = [g for g in synt_geom if g.intersects(region)]
+        
+        # --- Hausdorff distance ---
+        hd, hd_geom = compute_hausdorff(reg_act_geom, reg_synt_geom,
+                                        distance=distance)
+        return hd, hd_geom
 
     def plot_regions_list(
             self,
@@ -540,11 +537,12 @@ class FlatNormFixture(unittest.TestCase):
             ax=None, to_file=None, show=True,
             **kwargs
     ):
-        kwargs.setdefault('figsize', (13, 8))
-        fontsize = kwargs.get('fontsize', 20)
+        kwargs.setdefault('figsize', (26, 16))
+        fontsize = kwargs.get('fontsize', 30)
         do_return = kwargs.get('do_return', False)
         region = kwargs.get('region', None)
-        hd_geom = kwargs.get("hd_geom",None)
+        hd_geom = kwargs.get("hd_geom", None)
+        location = kwargs.get("legend_location", "best")
 
         # ---- PLOT ----
         # fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
@@ -555,7 +553,8 @@ class FlatNormFixture(unittest.TestCase):
             if figure == "input":
                 plot_triangulation(triangulated, T1, T2, axs[i], 
                                    show_triangulation=False, 
-                                   region_bound=region, legend=True)
+                                   region_bound=region, 
+                                   legend=True, location=location)
             elif figure == "fn":
                 plot_norm(triangulated, echain, tchain, axs[i], 
                           region_bound=region)
@@ -563,7 +562,8 @@ class FlatNormFixture(unittest.TestCase):
                 plot_triangulation(triangulated, T1, T2, axs[i], 
                                    show_triangulation=False, 
                                    hd_geom = hd_geom,
-                                   region_bound=region, legend=True)
+                                   region_bound=region, 
+                                   legend=True, location=location)
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"

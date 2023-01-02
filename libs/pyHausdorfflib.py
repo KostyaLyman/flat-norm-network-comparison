@@ -54,10 +54,23 @@ def compute_length(geometry, distance="euclidean"):
 def compute_hausdorff(act_geom, synt_geom, distance="euclidean"):
     act_geom_pts = interpolate_points(act_geom)
     synt_geom_pts = interpolate_points(synt_geom)
+    # check_hausdorff(act_geom_pts, synt_geom_pts)
     if distance == "euclidean":
-        hd,i,j,_,_,_ = hausdorff_(act_geom_pts,synt_geom_pts,
+        hd1,i1,j1,_,_,_ = hausdorff_(act_geom_pts,synt_geom_pts,
+                                  distance=euclid_dist)
+        hd2,i2,j2,_,_,_ = hausdorff_(synt_geom_pts,act_geom_pts,
                                   distance=euclid_dist)
     elif distance == "geodesic":
-        hd,i,j,_,_,_ = hausdorff_(act_geom_pts,synt_geom_pts,
+        hd1,i1,j1,_,_,_ = hausdorff_(act_geom_pts,synt_geom_pts,
                                   distance=geodist)
-    return hd, LineString((Point(act_geom_pts[i]), Point(synt_geom_pts[j])))
+        hd2,i2,j2,_,_,_ = hausdorff_(synt_geom_pts,act_geom_pts,
+                                  distance=geodist)
+    if hd1 >= hd2:
+        hd = hd1
+        hd_geom = LineString((Point(act_geom_pts[i1]), 
+                              Point(synt_geom_pts[j1])))
+    else:
+        hd = hd2
+        hd_geom = LineString((Point(synt_geom_pts[i2]), 
+                              Point(act_geom_pts[j2])))
+    return hd, hd_geom

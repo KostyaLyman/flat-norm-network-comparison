@@ -16,7 +16,7 @@ import csv
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
 FNN = NORMALIZED_FLAT_NORM = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}"
-HD = HAUSDORFF_DISTANCE = "\\mathbb{{D}}_{{Haus}}"
+HAUS = HAUSDORFF_DISTANCE_NORM = "\\widetilde{{\\mathbb{{D}}}}_{{Haus}}"
 MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 
 
@@ -58,15 +58,25 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
         act_geom, synt_geom,
         lambda_=lamb_,
         normalized=True,
-        compute_haus_dist=True,
         plot=True
     )
+    
+    # compute hausdorff distance
+    hd, hd_geom = fx.compute_region_hausdorff(
+        fx.get_region(point, eps),
+        act_geom, synt_geom,
+        distance = "euclidean",
+        )
+    haus = hd / w
+    plot_data["hd_geom"] = hd_geom
+    
     
     titles = {
         'lambda': f"$\\lambda = {lambda_:d}$",
         'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
         'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
         'fn': f"${FNN}={norm:0.3g}$",
+        'haus': f"${HAUS}={haus:0.3g}$"
     }
     title = ", ".join([titles[t_name] for t_name in titles])
     
@@ -75,10 +85,13 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
         epsilon=eps, lambda_=lamb_,
         to_file=f"{area}-fn_region_{region}",
         suptitle=title,
+        show_figs = ["haus", "fn"],
         do_return=False, show=True,
+        figsize=(26,14),
+        legend_location = "upper left",
         **plot_data
         )
-    return norm, w
+    return norm, haus, w
 
 
 
@@ -91,7 +104,7 @@ lambda_ = 1000
 for ind in ind_label:
     pt = Point(struct["vertices"][ind])
     region = fx.get_region(pt, epsilon)
-    hd, w = compute_hausdorff_region(ind, pt, epsilon)
+    fn, hd, w = compute_flat_norm_region(ind, pt, epsilon, lambda_)
 
 
 sys.exit(0)

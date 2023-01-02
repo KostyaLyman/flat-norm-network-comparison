@@ -295,7 +295,7 @@ def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
     
     # Plot the hausdorff distance
     hd_geom = kwargs.get("hd_geom", None)
-    if not hd_geom:
+    if hd_geom:
         hd_vertices = [Point(c) for c in hd_geom.coords]
         draw_points(ax, hd_vertices, color='green', size=20, 
                     alpha=1.0, marker='o')
@@ -314,8 +314,9 @@ def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
     
     # ---- legend for figure ----
     legend = kwargs.get('legend', False)
+    location = kwargs.get('location', "best")
     if legend:
-        ax.legend(fontsize=22, markerscale=2.5, loc="lower right")
+        ax.legend(fontsize=30, markerscale=3, loc=location)
     return ax
 
 
