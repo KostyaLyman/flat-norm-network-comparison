@@ -45,6 +45,7 @@ FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
 FNN = NORMALIZED_FLAT_NORM = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}"
 FNNM = FNM = FLAT_NORM_MEAN = "\\widehat{{\\mathbb{{F}}}}_{{\\lambda}}"
 FNNC = FNC = FLAT_NORM_CITY = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}^{{\\  G}}"
+HAUS = HAUSDORFF_DISTANCE = "\\mathbb{{D}}_{{Haus}}"
 CITY = lambda x: f"{{\\bf {area_name[x]}}}"
 
 
@@ -262,6 +263,7 @@ class FlatNormFixture(unittest.TestCase):
                 'flatnorms': np.float64,
                 'input_ratios': np.float64,
                 'index':int,
+                'hausdorff':np.float64,
                 'MIN_X': np.float64,
                 'MIN_Y': np.float64,
                 'MAX_X': np.float64,
@@ -1005,8 +1007,10 @@ class FlatNormFixture(unittest.TestCase):
         return stats_data
     
     
-    def plot_stability_fn_vs_ratio(self, fn_df, fn_index_df, index, 
-                                   radius=None, ax=None, **kwargs):
+    def plot_stability_result(self, fn_df, fn_index_df, index, 
+                                   radius=None, ax=None, 
+                                   include_hausdorff=False,
+                                   **kwargs):
         """
         :param kwargs: highlight: set, highlight_marker: str;
                        highlight_size: int, scatter_size: int, index_size: int;
@@ -1020,11 +1024,8 @@ class FlatNormFixture(unittest.TestCase):
         fig, ax, _ = get_fig_from_ax(ax, **kwargs)
 
         colors = {
-            'ind_region': kwargs.get('index_color', 'xkcd:electric blue'),
-            'scatter': kwargs.get('scatter_color', 'xkcd:pastel blue'),
-            'highlight': kwargs.get('highlight_color', 'xkcd:pumpkin'),
-            'fn_mean': kwargs.get('fn_mean_color', 'xkcd:kelly green'),
-            'regression': kwargs.get('regression_color', 'red'),
+            'ind_region': kwargs.get('index_color', 'xkcd:electric pink'),
+            'scatter': kwargs.get('scatter_color', 'xkcd:pastel pink'),
         }
 
         # flatnorm VS ratios ------------------------------------------------------
@@ -1034,101 +1035,48 @@ class FlatNormFixture(unittest.TestCase):
             idx = pd.IndexSlice
             fn_df = fn_df.loc[idx[:, index], ].copy()
 
-        x_ratios = fn_df['input_ratios'].to_numpy()
+        # get the metric for the perturbed networks
         y_flatnorms = fn_df['flatnorms'].to_numpy()
+        y_hausdorff = fn_df['hausdorff'].to_numpy()
+
+        # get the original metric
+        index_fn, index_hd = fn_index_df.loc[index, ['flatnorms', 'hausdorff']]
+        print(index_fn,index_hd)
+
+        # get the percentage deviation
+        delta_fn = 100.0 * (y_flatnorms - index_fn) / index_fn
+        delta_hd = 100.0 * (y_hausdorff - index_hd) / index_hd
 
         ax.scatter(
-            x_ratios, y_flatnorms,
-            alpha=0.7,
+            delta_hd, delta_fn,
+            alpha=1.0,
             s=kwargs.get('scatter_size', 5 ** 2),
             c=colors['scatter'],
             marker='o'
         )
+
+        
+
+        # plot config -------------------------------------------------------------
+        ax.set_xlabel(f"% Deviation in ${HAUS}$", 
+                      fontsize=kwargs.get('xylabel_fontsize', 22))
+        ax.set_ylabel(f"% Deviation in ${FNN}$",
+                      rotation=kwargs.get('y_label_rotation', 'vertical'),
+                      fontsize=kwargs.get('xylabel_fontsize', 22))
+        ax.set_xlim(left=-100, right=100)
+        ax.set_ylim(bottom=-100, top=100)
+        
         
         # mean line ---------------------------------------------------------------
         fn_mean = y_flatnorms.mean()
         fn_sd = y_flatnorms.std()
-        if kwargs.get('mean_line', True):
-            ax.plot(
-                [0, 100], [fn_mean, fn_mean],
-                c=colors['fn_mean'], linewidth=3, alpha=0.5
-            )
-            ax.plot(
-                [0, 100], [fn_mean - fn_sd, fn_mean - fn_sd],
-                c=colors['fn_mean'], linewidth=1, linestyle=long_dashed, alpha=0.5,
-            )
-            ax.plot(
-                [0, 100], [fn_mean + fn_sd, fn_mean + fn_sd],
-                c=colors['fn_mean'], linewidth=1, linestyle=long_dashed, alpha=0.5,
-            )
+        hd_mean = y_hausdorff.mean()
+        hd_sd = y_hausdorff.std()
 
-        # flatnorm for indexed region -----------------------------------------------------
-        index_fn, index_ratio = fn_index_df.loc[index, ['flatnorms', 'input_ratios']]
-        if kwargs.get('index_point', True):
-            ax.scatter(
-                [index_ratio], [index_fn],
-                alpha=1,
-                s=kwargs.get('index_size', 15 ** 2),
-                color=colors['ind_region'],
-                marker='*'
-            )
         
-        # regression line ---------------------------------------------------------
-        N = len(x_ratios)
-        b, a = np.polyfit(x_ratios, y_flatnorms, deg=1)
-        y_predict = a + b * x_ratios
-        y_var = sum((y_predict - y_flatnorms) ** 2) / (N - 1)
-        y_err = math.sqrt(y_var)
-        b_var = y_var / sum((x_ratios - x_ratios.mean()) ** 2)
-        b_err = math.sqrt(b_var)
-        # correlation & R2
-        fn_ratio_corr = np.corrcoef(x_ratios, y_flatnorms)[0, 1]
-        fn_ratio_r2 = r2_score(y_flatnorms, y_predict)
-
-        if kwargs.get('reg_line', True):
-            xseq = np.linspace(0, 1, num=10)
-            ax.plot(xseq, a + b * xseq, color=colors['regression'], lw=3, alpha=0.5)
-            ax.plot(
-                xseq, a + y_err + b * xseq,
-                color=colors['regression'], lw=1, alpha=0.5, linestyle=long_dashed
-            )
-            ax.plot(
-                xseq, a - y_err + b * xseq,
-                color=colors['regression'], lw=1, alpha=0.5, linestyle=long_dashed
-            )
-
-        # # stat data dict ----------------------------------------------------------
-        # stat_dict = {
-        #     'a': a, 'b': b,
-        #     'err': math.sqrt(y_var),
-        #     'std_err': np.std(y_predict - y_flatnorms),
-        #     'b_err': b_err,
-        #     'corr': fn_ratio_corr,
-        #     'R2': fn_ratio_r2,
-        #     'fn_mean': fn_mean,
-        #     'fn_sd': fn_sd,
-        # }
-
-        # ticks -------------------------------------------------------------------
-        ax.set_xticks([index_ratio], [f"{index_ratio:0.3g}"], color=colors['ind_region'], 
-                      minor=True, fontsize=kwargs.get('tick_fontsize', 15))
-        ax.set_yticks([index_fn],
-                      labels=[f"{index_fn:0.3g}"],
-                      minor=True, fontsize=kwargs.get('tick_fontsize', 15))
-
-        for tlabel, tcolor in zip(ax.get_yticklabels(minor=True), 
-                                  [colors['ind_region'], colors['fn_mean']]):
-            tlabel.set_color(tcolor)
         
-
-        # plot title --------------------------------------------------------------
-        titles = dict(
-            fn=f"${FNM}={fn_mean:0.3g} \pm {fn_sd:0.3g}$",
-            beta=f"$\\hat{{\\beta}}={b:0.3g} \pm {b_err:0.3g}$",
-            corr=f"$\\rho={fn_ratio_corr:0.3g}$",
-            r2=f"$R^{{2}}={fn_ratio_r2:0.3g}$",
-        )
-        which_titles = kwargs.get('titles', list(titles.keys()))
+        subtitle1 = f"${FNM}={fn_mean:0.3g} \pm {fn_sd:0.3g}$"
+        subtitle2 = f"${HAUS}={hd_mean:0.3g} \pm {hd_sd:0.3g}$"
 
         title_styles = dict(
             ii=f"region index : ${{index:d}}$",
@@ -1144,18 +1092,9 @@ class FlatNormFixture(unittest.TestCase):
         else:
             title = title_styles['ii'].format(index=index)
 
-        subtitle = ", ".join([titles[t_name] for t_name in which_titles])
-        title = f"{title} : {subtitle}"
+        
+        title = f"{title} : {subtitle1} : {subtitle2}"
         ax.set_title(title, fontsize=kwargs.get('title_fontsize', 30))
-
-        # plot config -------------------------------------------------------------
-        ax.set_xlabel(f"Ratio $|T|/\\epsilon$", 
-                      fontsize=kwargs.get('xylabel_fontsize', 22))
-        ax.set_ylabel(f"Normalized flat norm ${FNN}$",
-                      rotation=kwargs.get('y_label_rotation', 'vertical'),
-                      fontsize=kwargs.get('xylabel_fontsize', 22))
-        ax.set_xlim(left=0, right=0.5)
-        ax.set_ylim(bottom=0, top=1.05)
-        return fn_mean, index_fn
+        return fn_mean, hd_mean, index_fn, index_hd
 
         

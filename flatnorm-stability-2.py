@@ -23,8 +23,8 @@ MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 workpath = os.getcwd()
 sys.path.append(workpath+'/libs/')
 
-from pyFlatNormFixture import FlatNormFixture
-from pyFlatNormlib import get_structure
+from libs.pyFlatNormFixture import FlatNormFixture
+from libs.pyFlatNormlib import get_structure
 
 
 # get fixture
@@ -88,7 +88,7 @@ lambda_ = 1000
 
 # compute stats
 flatnorm_stability_data = {
-    'radius':[], 'flatnorms': [], 'input_ratios': [], 'index': [],
+    'radius':[], 'flatnorms': [], 'input_ratios': [], 'index': [], 'hausdorff': [],
     'MIN_X': [], 'MIN_Y': [], 'MAX_X': [], 'MAX_Y': []
 }
 
@@ -109,6 +109,13 @@ for ind in ind_label:
             normalized=True,
             plot=False
         )
+
+        # compute hausdorff distance
+        hd, hd_geom = fx.compute_region_hausdorff(
+            fx.get_region(point, epsilon),
+            act_geom, syn_geom,
+            distance = "euclidean",
+            )
         
         # Update statistics
         flatnorm_stability_data['index'].append(ind)

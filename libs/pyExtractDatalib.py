@@ -13,8 +13,14 @@ from __future__ import print_function
 
 import geopandas as gpd
 import networkx as nx
+from networkx.utils import open_file
 from shapely.geometry import Point
 from libs.pyGeometrylib import Link
+import pickle
+
+@open_file(0, mode='rb')
+def read_gpickle(path):
+    return pickle.load(path)
 
 
 #%% Get output synthetic networks (output of Step 2)
@@ -48,7 +54,7 @@ def GetDistNet(path, code):
         graph = nx.Graph()
         for c in code:
             # g = nx.read_gpickle(path+str(c)+'-dist-net.gpickle')
-            g = nx.read_gpickle(f"{path}/{c}-dist-net.gpickle")
+            g = read_gpickle(f"{path}/{c}-dist-net.gpickle")
             graph = nx.compose(graph, g)
     else:
         # graph = nx.read_gpickle(path+str(code)+'-dist-net.gpickle')

@@ -16,15 +16,15 @@ import csv
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
 FNN = NORMALIZED_FLAT_NORM = "\\widetilde{{\\mathbb{{F}}}}_{{\\lambda}}"
-HAUS = HAUSDORFF_DISTANCE_NORM = "\\widetilde{{\\mathbb{{D}}}}_{{Haus}}"
+HAUS = HAUSDORFF_DISTANCE = "\\mathbb{{D}}_{{Haus}}"
 MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 
 
 workpath = os.getcwd()
 sys.path.append(workpath+'/libs/')
 
-from pyFlatNormFixture import FlatNormFixture
-from pyFlatNormlib import get_structure
+from libs.pyFlatNormFixture import FlatNormFixture
+from libs.pyFlatNormlib import get_structure
 
 
 # get fixture
@@ -48,7 +48,7 @@ ind_label = {
     930: 'ex4'}
 
 #%% Flat norm computation
-def compute_flat_norm_region(ind,point,eps,lamb_):
+def compute_flat_norm_region(ind,point,eps,lamb_,plot_result=True):
     # Tag the point
     region = ind_label[ind]
     
@@ -65,9 +65,8 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
     hd, hd_geom = fx.compute_region_hausdorff(
         fx.get_region(point, eps),
         act_geom, synt_geom,
-        distance = "euclidean",
+        distance = "geodesic",
         )
-    haus = hd / w
     plot_data["hd_geom"] = hd_geom
     
     
@@ -76,22 +75,23 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
         'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
         'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
         'fn': f"${FNN}={norm:0.3g}$",
-        'haus': f"${HAUS}={haus:0.3g}$"
+        'haus': f"${HAUS}={hd:0.3g}$"
     }
     title = ", ".join([titles[t_name] for t_name in titles])
     
     # plot flat norm
-    fx.plot_triangulated_region_flatnorm(
-        epsilon=eps, lambda_=lamb_,
-        to_file=f"{area}-fn_region_{region}",
-        suptitle=title,
-        show_figs = ["haus", "fn"],
-        do_return=False, show=True,
-        figsize=(26,14),
-        legend_location = "upper left",
-        **plot_data
-        )
-    return norm, haus, w
+    if plot_result:
+        fx.plot_triangulated_region_flatnorm(
+            epsilon=eps, lambda_=lamb_,
+            to_file=f"{area}-fn_region_{region}",
+            suptitle=title,
+            show_figs = ["haus", "fn"],
+            do_return=False, show=True,
+            figsize=(26,14),
+            legend_location = "upper left",
+            **plot_data
+            )
+    return norm, hd, w
 
 
 
@@ -101,29 +101,23 @@ def compute_flat_norm_region(ind,point,eps,lamb_):
 epsilon = 1e-3
 lambda_ = 1000
 
-for ind in ind_label:
-    pt = Point(struct["vertices"][ind])
-    region = fx.get_region(pt, epsilon)
-    fn, hd, w = compute_flat_norm_region(ind, pt, epsilon, lambda_)
-
-
-sys.exit(0)
 
 # compute stats
 flatnorm_data = {
-    'flatnorms': [], 'input_ratios': [], 'index': [],
+    'flatnorms': [], 'input_ratios': [], 'index': [], 'hausdorff': [],
     'MIN_X': [], 'MIN_Y': [], 'MAX_X': [], 'MAX_Y': []
 }
 
 for ind in ind_label:
     pt = Point(struct["vertices"][ind])
     region = fx.get_region(pt, epsilon)
-    norm, w = compute_flat_norm_region(ind, pt, epsilon, lambda_)
+    norm, hd, w = compute_flat_norm_region(ind, pt, epsilon, lambda_,plot_result=False)
     
     # store the data
     flatnorm_data['index'].append(ind)
     flatnorm_data['flatnorms'].append(norm)
     flatnorm_data['input_ratios'].append(w/epsilon)
+    flatnorm_data['hausdorff'].append(hd)
     region_bounds = region.exterior.bounds
     flatnorm_data['MIN_X'].append(region_bounds[MIN_X])
     flatnorm_data['MIN_Y'].append(region_bounds[MIN_Y])

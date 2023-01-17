@@ -23,8 +23,8 @@ MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 workpath = os.getcwd()
 sys.path.append(workpath+'/libs/')
 
-from pyFlatNormFixture import FlatNormFixture
-from pyFlatNormlib import get_structure
+from libs.pyFlatNormFixture import FlatNormFixture
+from libs.pyFlatNormlib import get_structure
 
 
 # get fixture
@@ -41,8 +41,10 @@ area = 'mcbryde'
 ind_label = {
     994: 'ex1',
     1003:'ex2',
-    967: 'ex3',
-    930: 'ex4'}
+#     967: 'ex3',
+#     930: 'ex4'
+    }
+
 
 
 #%% Perturbations
@@ -88,7 +90,7 @@ lambda_ = 1000
 
 # compute stats
 flatnorm_stability_data = {
-    'radius':[], 'flatnorms': [], 'input_ratios': [], 'index': [],
+    'radius':[], 'flatnorms': [], 'input_ratios': [], 'index': [], 'hausdorff': [],
     'MIN_X': [], 'MIN_Y': [], 'MAX_X': [], 'MAX_Y': []
 }
 
@@ -109,12 +111,20 @@ for rad in radius_list:
                 normalized=True,
                 plot=False
             )
+
+            # compute hausdorff distance
+            hd, _ = fx.compute_region_hausdorff(
+                fx.get_region(point, epsilon),
+                act_geom, syn_geom,
+                distance = "geodesic",
+                )
             
             # Update statistics
             flatnorm_stability_data['radius'].append(rad)
             flatnorm_stability_data['index'].append(ind)
             flatnorm_stability_data['flatnorms'].append(norm)
             flatnorm_stability_data['input_ratios'].append(w/epsilon)
+            flatnorm_stability_data['hausdorff'].append(hd)
             region_bounds = region.exterior.bounds
             flatnorm_stability_data['MIN_X'].append(region_bounds[MIN_X])
             flatnorm_stability_data['MIN_Y'].append(region_bounds[MIN_Y])
@@ -129,7 +139,6 @@ print("-------------------------------------------------------------------------
 print(
     f"compute flatnorm for {num_networks} perturbed networks"
     f"for {len(radius_list)} radii "
-    # f"and {len(lambdas)} lambdas = {timedelta(seconds=end_global - start_global)}"
     )
 print("--------------------------------------------------------------------------")
 
