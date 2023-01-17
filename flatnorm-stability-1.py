@@ -82,7 +82,7 @@ act_geom, synth_geom, hull = fx.read_networks(area)
 struct = get_structure(act_geom)
 
 # parameters
-num_networks = 100
+num_networks = 1000
 radius_list = [10,20,30,40,50]
 epsilon = 1e-3
 lambda_ = 1000

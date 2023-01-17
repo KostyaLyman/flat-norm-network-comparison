@@ -45,7 +45,7 @@ ind_label = {
 radii = [10, 20, 30, 40, 50]
 
 df_fn, df_ind = fx.read_stability_stats(
-    f"{area}-FN_STABILITY_STAT_N100_R5",
+    f"{area}-FN_STABILITY_STAT_N1000_R5",
     f"{area}-FN_STAT_INDEX",
     in_dir=fx.out_dir)
 
@@ -55,14 +55,14 @@ L = len(radii)
 
 
 for i,index in enumerate(ind_label):
-    fig, axs = plt.subplots(1, L, figsize=(L * 20, 20), constrained_layout=True)
+    fig, axs = plt.subplots(1, L, figsize=(L * 25, 25), constrained_layout=True)
     fn_means, hd_means, fn_index, hd_index = list(), list(), list(), list()
     
     for e, radius in enumerate(radii):
         fnm, hdm, fni, hdi = fx.plot_stability_result(
             df_fn, df_ind, index, radius=radius, ax=axs[e],
-            title_fontsize=40, xylabel_fontsize=45, tick_fontsize=45,
-            scatter_size=300, index_size=800,
+            title_fontsize=55, xylabel_fontsize=60, tick_fontsize=45,
+            scatter_size=1000,
         )
         fn_means.append(fnm)
         hd_means.append(hdm)
@@ -76,7 +76,7 @@ for i,index in enumerate(ind_label):
     hdi_mean, hdi_std = np.array(hd_index).mean(), np.array(hd_index).std()
 
     fnm_suptitle = f"${{\\sf mean}}({FNM})={fnm_mean:0.3g}, {{\\sf sd}}({FNM})={fnm_std:0.3g}$"
-    fnm_suptitle_short = f"perturbed ${FNM}={fnm_mean:0.3g} \\pm {fnm_std:0.3g}$ ${HAUSM}={hdm_mean:0.3g} \\pm {hdm_std:0.3g}$"
+    fnm_suptitle_short = f"perturbed ${FNM}={fnm_mean:0.3g} \\pm {fnm_std:0.3g}$, ${HAUSM}={hdm_mean:0.3g} \\pm {hdm_std:0.3g}$"
     fnm_prefix = f"Scatter plot of ${FNN}$ for perturbed networks in region {ind_label[index]}"
     city_suptitle = f"original ${FNN}={fni_mean:0.3g}$, ${HAUS}={hdi_mean:0.3g}$"
     fig.suptitle(f"{fnm_prefix}  :  {city_suptitle}  :  {fnm_suptitle_short}", fontsize=70)

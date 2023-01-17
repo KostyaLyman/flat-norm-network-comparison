@@ -1041,7 +1041,6 @@ class FlatNormFixture(unittest.TestCase):
 
         # get the original metric
         index_fn, index_hd = fn_index_df.loc[index, ['flatnorms', 'hausdorff']]
-        print(index_fn,index_hd)
 
         # get the percentage deviation
         delta_fn = 100.0 * (y_flatnorms - index_fn) / index_fn
