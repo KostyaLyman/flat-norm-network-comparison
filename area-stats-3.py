@@ -43,10 +43,10 @@ ind_label = {
     # 930: 'ex4'
     }
 radii = [10, 20, 30, 40, 50]
-
+lambda_ = 1
 df_fn, df_ind = fx.read_stability_stats(
-    f"{area}-FN_STABILITY_STAT_N1000_R5",
-    f"{area}-FN_STAT_INDEX",
+    f"{area}-L{lambda_}_FN_STABILITY_STAT_N1000_R5",
+    f"{area}-L{lambda_}_FN_STAT_INDEX",
     in_dir=fx.out_dir)
 
 
@@ -81,5 +81,5 @@ for i,index in enumerate(ind_label):
     city_suptitle = f"original ${FNN}={fni_mean:0.3g}$, ${HAUS}={hdi_mean:0.3g}$"
     fig.suptitle(f"{fnm_prefix}  :  {city_suptitle}  :  {fnm_suptitle_short}", fontsize=70)
 
-    file_name = f"{fx.area}-stability_flatnorm_{ind_label[index]}"
+    file_name = f"{fx.area}-L{lambda_}_stability_flatnorm_{ind_label[index]}"
     close_fig(fig, to_file=f"{fx.fig_dir}/{file_name}.png", show=True)

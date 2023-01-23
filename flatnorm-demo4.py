@@ -83,7 +83,7 @@ def compute_flat_norm_region(ind,point,eps,lamb_,plot_result=True):
     if plot_result:
         fx.plot_triangulated_region_flatnorm(
             epsilon=eps, lambda_=lamb_,
-            to_file=f"{area}-fn_region_{region}",
+            to_file=f"{area}-L{lamb_}_fn_region_{region}",
             suptitle=title,
             show_figs = ["haus", "fn"],
             do_return=False, show=True,
@@ -99,7 +99,7 @@ def compute_flat_norm_region(ind,point,eps,lamb_,plot_result=True):
 
 # parameters
 epsilon = 1e-3
-lambda_ = 1000
+lambda_ = 1
 
 
 # compute stats
@@ -111,8 +111,8 @@ flatnorm_data = {
 for ind in ind_label:
     pt = Point(struct["vertices"][ind])
     region = fx.get_region(pt, epsilon)
-    norm, hd, w = compute_flat_norm_region(ind, pt, epsilon, lambda_,plot_result=False)
-    
+    norm, hd, w = compute_flat_norm_region(ind, pt, epsilon, lambda_,plot_result=True)
+    # sys.exit(0)
     # store the data
     flatnorm_data['index'].append(ind)
     flatnorm_data['flatnorms'].append(norm)
@@ -126,7 +126,7 @@ for ind in ind_label:
     
 
 df = pd.DataFrame(flatnorm_data)
-filename = f"{area}-FN_STAT_INDEX"
+filename = f"{area}-L{lambda_}_FN_STAT_INDEX"
 with open(f"{fx.out_dir}/{filename}.csv", "w") as outfile:
     df.to_csv(outfile, sep=",", index=False,
               header=True, quoting=csv.QUOTE_NONNUMERIC)

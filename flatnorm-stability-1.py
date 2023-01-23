@@ -85,7 +85,7 @@ struct = get_structure(act_geom)
 num_networks = 1000
 radius_list = [10,20,30,40,50]
 epsilon = 1e-3
-lambda_ = 1000
+lambda_ = 1
 
 
 # compute stats
@@ -144,7 +144,7 @@ print("-------------------------------------------------------------------------
 
 
 
-file_name = f"{area}-FN_STABILITY_STAT_N{num_networks}_R{len(radius_list)}"
+file_name = f"{area}-L{lambda_}_FN_STABILITY_STAT_N{num_networks}_R{len(radius_list)}"
 import csv
 with open(f"{fx.out_dir}/{file_name}.csv", "w") as outfile:
     df_stability.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
