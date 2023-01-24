@@ -94,52 +94,54 @@ struct = get_structure(act_geom)
 
 # parameters
 num_networks = 1000
-max_radius = 20
+max_radius_list = [20]
 epsilon = 1e-3
 lambda_ = 1e-3
 
 
 # compute stats
 flatnorm_stability_data = {
-    'flatnorms': [], 'input_ratios': [], 'index': [], 'hausdorff': [],
+    'radius': [], 'flatnorms': [], 'input_ratios': [], 'index': [], 'hausdorff': [],
     'MIN_X': [], 'MIN_Y': [], 'MAX_X': [], 'MAX_Y': []
 }
 
 # Construct perturbed synthetic network
 np.random.seed(123)
-sgeom_list = variant_geometry(synth_geom, radius=max_radius, N=num_networks)
-# compute flat norm and append to statistics disctionary
-for ind in ind_label:
-    point = Point(struct["vertices"][ind])
-    region = fx.get_region(point, epsilon)
-    
-    # Compute local flat norm for perturbed networks
-    for syn_geom in sgeom_list:
-        norm, enorm, tnorm, w = fx.compute_region_flatnorm(
-                region,
-                act_geom, syn_geom,
-                lambda_=lambda_,
-                normalized=True,
-                plot=False
-            )
-
-        # compute hausdorff distance
-        hd, _ = fx.compute_region_hausdorff(
-            fx.get_region(point, epsilon),
-            act_geom, syn_geom,
-            distance = "geodesic",
-            )
+for max_radius in max_radius_list:
+    sgeom_list = variant_geometry(synth_geom, radius=max_radius, N=num_networks)
+    # compute flat norm and append to statistics disctionary
+    for ind in ind_label:
+        point = Point(struct["vertices"][ind])
+        region = fx.get_region(point, epsilon)
         
-        # Update statistics
-        flatnorm_stability_data['index'].append(ind)
-        flatnorm_stability_data['flatnorms'].append(norm)
-        flatnorm_stability_data['input_ratios'].append(w/epsilon)
-        flatnorm_stability_data['hausdorff'].append(hd)
-        region_bounds = region.exterior.bounds
-        flatnorm_stability_data['MIN_X'].append(region_bounds[MIN_X])
-        flatnorm_stability_data['MIN_Y'].append(region_bounds[MIN_Y])
-        flatnorm_stability_data['MAX_X'].append(region_bounds[MAX_X])
-        flatnorm_stability_data['MAX_Y'].append(region_bounds[MAX_Y])
+        # Compute local flat norm for perturbed networks
+        for syn_geom in sgeom_list:
+            norm, enorm, tnorm, w = fx.compute_region_flatnorm(
+                    region,
+                    act_geom, syn_geom,
+                    lambda_=lambda_,
+                    normalized=True,
+                    plot=False
+                )
+
+            # compute hausdorff distance
+            hd, _ = fx.compute_region_hausdorff(
+                fx.get_region(point, epsilon),
+                act_geom, syn_geom,
+                distance = "geodesic",
+                )
+            
+            # Update statistics
+            flatnorm_stability_data['radius'].append(max_radius)
+            flatnorm_stability_data['index'].append(ind)
+            flatnorm_stability_data['flatnorms'].append(norm)
+            flatnorm_stability_data['input_ratios'].append(w/epsilon)
+            flatnorm_stability_data['hausdorff'].append(hd)
+            region_bounds = region.exterior.bounds
+            flatnorm_stability_data['MIN_X'].append(region_bounds[MIN_X])
+            flatnorm_stability_data['MIN_Y'].append(region_bounds[MIN_Y])
+            flatnorm_stability_data['MAX_X'].append(region_bounds[MAX_X])
+            flatnorm_stability_data['MAX_Y'].append(region_bounds[MAX_Y])
 
 
 

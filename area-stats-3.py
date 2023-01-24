@@ -43,9 +43,10 @@ ind_label = {
     # 930: 'ex4'
     }
 radii = [10, 20, 30, 40, 50]
+num_networks = 1000
 lambda_ = 0.001
 df_fn, df_ind = fx.read_stability_stats(
-    f"{area}-L{lambda_}_FN_STABILITY_STAT_N1000_R5",
+    f"{area}-L{lambda_}_FN_STABILITY_STAT_N{num_networks}_R{len(radii)}",
     f"{area}-L{lambda_}_FN_STAT_INDEX",
     in_dir=fx.out_dir)
 

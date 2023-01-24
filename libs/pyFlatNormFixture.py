@@ -271,7 +271,10 @@ class FlatNormFixture(unittest.TestCase):
             }
         )
         fn_stat_df['id'] = list(range(len(fn_stat_df)))
-        fn_stat_df = fn_stat_df.set_index(['radius', 'index'], drop=False)
+        try:
+            fn_stat_df = fn_stat_df.set_index(['radius', 'index'], drop=False)
+        except:
+            fn_stat_df = fn_stat_df.set_index(['index'], drop=False)
         
         fn_index_df = pd.read_csv(
             fn_index_file,
@@ -1009,7 +1012,6 @@ class FlatNormFixture(unittest.TestCase):
     
     def plot_stability_result(self, fn_df, fn_index_df, index, 
                                    radius=None, ax=None, 
-                                   include_hausdorff=False,
                                    **kwargs):
         """
         :param kwargs: highlight: set, highlight_marker: str;
@@ -1095,5 +1097,69 @@ class FlatNormFixture(unittest.TestCase):
         title = f"{title} : {subtitle1} : {subtitle2}"
         ax.set_title(title, fontsize=kwargs.get('title_fontsize', 30))
         return fn_mean, hd_mean, index_fn, index_hd
+    
+    def plot_stability_outlier(self, fn_df, fn_index_df, index, 
+                                   radius=None, ax=None, 
+                                   **kwargs):
+        """
+        :param kwargs: highlight: set, highlight_marker: str;
+                       highlight_size: int, scatter_size: int, index_size: int;
+                       titles: list, title_style: str;
+                       reg_line: bool, mean_line: bool, index_point: bool;
+                       y_label_rotation: str;
+                       X_color: str -- where X in {ind_region, scatter, highlight, fn_mean, regression}
+                       X_fontsize: int -- where X in {title, xylabel};
+                       if ax is None: figsize, constrained_layout
+        """
+        fig, ax, _ = get_fig_from_ax(ax, **kwargs)
+
+        colors = {
+            'haus_region': kwargs.get('haus_color', 'xkcd:electric blue'),
+            'fn_region': kwargs.get('fn_color', 'xkcd:electric purple'),
+            'scatter': kwargs.get('scatter_color', 'xkcd:pastel pink'),
+        }
+
+        # flatnorm VS ratios ------------------------------------------------------
+        if radius:
+            fn_df = fn_df.loc[(radius, index), ].copy()
+        else:
+            idx = pd.IndexSlice
+            fn_df = fn_df.loc[idx[index], ].copy()
+
+        # get the metric for the perturbed networks
+        y_flatnorms = fn_df['flatnorms'].to_numpy()
+        y_hausdorff = fn_df['hausdorff'].to_numpy()
+
+        # get the original metric
+        index_fn, index_hd = fn_index_df.loc[index, ['flatnorms', 'hausdorff']]
+
+        ax.scatter(
+            y_hausdorff, y_flatnorms,
+            alpha=1.0,
+            s=kwargs.get('scatter_size', 5 ** 2),
+            c=colors['scatter'],
+            marker='o'
+        )
+
+        # ticks -------------------------------------------------------------------
+        ax.set_xticks([index_hd], [f"{index_hd:0.3g}"], color=colors['haus_region'], 
+                      minor=True, fontsize=15)
+        ax.set_yticks([index_fn], [f"{index_fn:0.3g}"], color = colors['fn_region'],
+                      minor=True, fontsize=15)
+        
+        ax.axvline(index_hd, linestyle='dashed',color=colors['haus_region'],linewidth=3)
+        ax.axhline(index_fn, linestyle='dashed',color=colors['fn_region'],linewidth=3)
+
+        ylim = kwargs.get("set_ylim", [0.25, 0.40])
+        ax.set_ylim(bottom=ylim[0], top=ylim[1])
+
+        # plot config -------------------------------------------------------------
+        ax.set_xlabel(f"Hausdorff distance ${HAUS}$", 
+                      fontsize=kwargs.get('xylabel_fontsize', 22))
+        ax.set_ylabel(f"Normalized flat norm ${FNN}$",
+                      rotation=kwargs.get('y_label_rotation', 'vertical'),
+                      fontsize=kwargs.get('xylabel_fontsize', 22))
+        
+        return index_fn, index_hd
 
         
