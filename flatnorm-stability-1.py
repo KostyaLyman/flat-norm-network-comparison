@@ -29,8 +29,8 @@ from libs.pyFlatNormlib import get_structure
 
 # get fixture
 fx = FlatNormFixture('runTest')
-fx.out_dir = "out/test"
-fx.fig_dir = "figs/test"
+fx.out_dir = "out/stability"
+fx.fig_dir = "figs/stability"
 
 
 

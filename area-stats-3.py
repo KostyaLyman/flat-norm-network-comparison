@@ -26,8 +26,8 @@ from libs.pyFlatNormFixture import FlatNormFixture, close_fig
 
 # get fixture
 fx = FlatNormFixture('runTest')
-fx.out_dir = "out/test"
-fx.fig_dir = "figs/test"
+fx.out_dir = "out/stability"
+fx.fig_dir = "figs/stability"
 fx.area = "mcbryde"
 
 
@@ -43,7 +43,7 @@ ind_label = {
     # 930: 'ex4'
     }
 radii = [10, 20, 30, 40, 50]
-lambda_ = 1e-3
+lambda_ = 0.001
 df_fn, df_ind = fx.read_stability_stats(
     f"{area}-L{lambda_}_FN_STABILITY_STAT_N1000_R5",
     f"{area}-L{lambda_}_FN_STAT_INDEX",

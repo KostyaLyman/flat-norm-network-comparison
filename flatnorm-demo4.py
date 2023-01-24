@@ -29,8 +29,8 @@ from libs.pyFlatNormlib import get_structure
 
 # get fixture
 fx = FlatNormFixture('runTest')
-fx.out_dir = "out/test"
-fx.fig_dir = "figs/test"
+fx.out_dir = "out/stability"
+fx.fig_dir = "figs/stability"
 
 
 
@@ -99,7 +99,7 @@ def compute_flat_norm_region(ind,point,eps,lamb_,plot_result=True):
 
 # parameters
 epsilon = 1e-3
-lambda_ = 1e-3
+lambda_ = 1000
 
 
 # compute stats
