@@ -71,7 +71,7 @@ def compute_flat_norm_region(ind,point,eps,lamb_,plot_result=True):
     
     
     titles = {
-        'lambda': f"$\\lambda = {lambda_:d}$",
+        'lambda': f"$\\lambda = {lambda_:0.4f}$",
         'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
         'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
         'fn': f"${FNN}={norm:0.3g}$",
@@ -99,7 +99,7 @@ def compute_flat_norm_region(ind,point,eps,lamb_,plot_result=True):
 
 # parameters
 epsilon = 1e-3
-lambda_ = 1
+lambda_ = 1e-3
 
 
 # compute stats

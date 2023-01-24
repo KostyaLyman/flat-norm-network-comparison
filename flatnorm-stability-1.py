@@ -85,7 +85,7 @@ struct = get_structure(act_geom)
 num_networks = 1000
 radius_list = [10,20,30,40,50]
 epsilon = 1e-3
-lambda_ = 1
+lambda_ = 1e-3
 
 
 # compute stats
