@@ -42,64 +42,14 @@ struct = get_structure(actual_geom)
 # label defnitions
 ind_label = {
     994: 'ex1',
-    1003:'ex2',
+    # 1003:'ex2',
     # 967: 'ex3',
     # 930: 'ex4'
     }
 
-#%% Flat norm computation
-def compute_metric_region(
-    act_geom, synt_geom,
-    ind, point, eps, lamb_, 
-    plot_result=True, 
-    suptitle_prefix="",
-    show_plot=True,
-    ):
-    # Tag the point
-    region = ind_label[ind]
-    
-    # compute flat norm
-    norm, enorm, tnorm, w, plot_data = fx.compute_region_flatnorm(
-        fx.get_region(point, eps),
-        act_geom, synt_geom,
-        lambda_=lamb_,
-        normalized=True,
-        plot=True
-    )
-    
-    # compute hausdorff distance
-    hd, hd_geom = fx.compute_region_hausdorff(
-        fx.get_region(point, eps),
-        act_geom, synt_geom,
-        distance = "geodesic",
-        )
-    plot_data["hd_geom"] = hd_geom
-    
-    
-    titles = {
-        'lambda': f"$\\lambda = {lambda_:0.4f}$",
-        'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
-        'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
-        'fn': f"${FNN}={norm:0.3g}$",
-        'haus': f"${HAUS}={hd:0.3g}$"
-    }
-    title = ", ".join([titles[t_name] for t_name in titles])
-    
-    # plot flat norm
-    if plot_result:
-        fx.plot_triangulated_region_flatnorm(
-            epsilon=eps, lambda_=lamb_,
-            to_file=f"{area}-L{lamb_}_outlier_region_{region}_{suptitle_prefix}",
-            suptitle=f"{suptitle_prefix} : {title}",
-            show_figs = ["haus", "fn"],
-            do_return=False, show=show_plot,
-            figsize=(26,14),
-            legend_location = "upper left",
-            **plot_data
-            )
-    return norm, hd, w
 
-#%% Perturbation functions
+
+# Perturbation functions
 def get_perturbed_verts(vertices, radius, perturb_index=None):
     n = vertices.shape[0]
     # Get the deviation radius in degrees
@@ -149,29 +99,21 @@ epsilon = 1e-3
 lambda_ = 1e-3
 
 
-# compute stats
-flatnorm_data = {
-    'flatnorms': [], 'input_ratios': [], 'index': [], 'hausdorff': [],
-    'MIN_X': [], 'MIN_Y': [], 'MAX_X': [], 'MAX_Y': []
-}
-
 for ind in ind_label:
     pt = Point(struct["vertices"][ind])
-    norm, hd, w = compute_metric_region(
+    region_ID = ind_label[ind]
+    region = fx.get_region(pt, epsilon)
+    norm, hd, w = fx.compute_region_metric(
         actual_geom, synthetic_geom,
-        ind, pt, epsilon, lambda_, 
-        suptitle_prefix = "",
-        plot_result=True, show_plot=False
+        pt, epsilon, lambda_, 
+        plot_result=True, show = False, 
+        show_figs = ["haus", "fn"], 
+        to_file = f"{area}-L{lambda_}_fn_region_{region_ID}", 
+        figsize=(26,14), legend_location = "upper left", 
         )
     
     sgeom_list = variant_geometry(synthetic_geom, radius=2000, N=1)
-    for l, syn_geom in enumerate(sgeom_list):
-        norm, hd, w = compute_metric_region(
-            actual_geom, syn_geom,
-            ind, pt, epsilon, lambda_, 
-            suptitle_prefix = f"perturbed{l+1}",
-            plot_result=True, show_plot=False
-            )
+    
     
 
 
