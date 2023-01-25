@@ -22,7 +22,7 @@ MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 workpath = os.getcwd()
 sys.path.append(workpath+'/libs/')
 
-from libs.pyFlatNormFixture import FlatNormFixture
+from libs.pyFlatNormFixture import FlatNormFixture, get_fig_from_ax, close_fig
 from libs.pyFlatNormlib import get_structure
 
 
@@ -30,8 +30,6 @@ from libs.pyFlatNormlib import get_structure
 fx = FlatNormFixture('runTest')
 fx.out_dir = "out/stability"
 fx.fig_dir = "figs/stability"
-
-
 
 # read geometries
 area = 'mcbryde'
@@ -92,27 +90,33 @@ def variant_geometry(geometry, radius=10, N=1):
                     for i,j in struct["segments"]])
     return new_geom
 
-#%% compute flat norm
+# compute flat norm
 
 # parameters
 epsilon = 1e-3
 lambda_ = 1e-3
 
+# fn_list = []
+# hd_list = []
+# w_list = []
+
+
+
 
 for ind in ind_label:
+    
     pt = Point(struct["vertices"][ind])
     region_ID = ind_label[ind]
     region = fx.get_region(pt, epsilon)
-    norm, hd, w = fx.compute_region_metric(
+    fn, hd, w, plot_data = fx.compute_region_metric(
         actual_geom, synthetic_geom,
-        pt, epsilon, lambda_, 
-        plot_result=True, show = False, 
-        show_figs = ["haus", "fn"], 
-        to_file = f"{area}-L{lambda_}_fn_region_{region_ID}", 
-        figsize=(26,14), legend_location = "upper left", 
+        pt, epsilon, lambda_,
+        plot=True 
         )
     
-    sgeom_list = variant_geometry(synthetic_geom, radius=2000, N=1)
+
+    
+    # sgeom_list = variant_geometry(synthetic_geom, radius=2000, N=1)
     
     
 

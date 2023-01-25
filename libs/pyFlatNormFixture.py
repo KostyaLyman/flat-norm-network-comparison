@@ -422,7 +422,6 @@ class FlatNormFixture(unittest.TestCase):
             self, region=None, act_geom=None, synt_geom=None,
             D=None, T1=None, T2=None,
             lambda_=1000,
-            normalized=False,
             **kwargs
     ):
         """
@@ -430,6 +429,7 @@ class FlatNormFixture(unittest.TestCase):
         """
         verbose = kwargs.setdefault('verbose', False)
         plot = kwargs.get('plot', False)
+        normalized = kwargs.get('normalized', True)
         
         # compute triangulation and currents
         if not D:
@@ -455,8 +455,6 @@ class FlatNormFixture(unittest.TestCase):
 
         # --- normalization ---
         input_length = np.dot(abs(T1), abs(w)) + np.dot(abs(T2), abs(w))
-        # if old_impl:
-        #     input_length = np.dot(abs(T), abs(w))   # old implementation
 
         if normalized:
             norm = norm / input_length
@@ -479,10 +477,8 @@ class FlatNormFixture(unittest.TestCase):
     
     def compute_region_hausdorff(
             self, region=None, act_geom=None, synt_geom=None, 
-            **kwargs
+            distance = "euclidean"
             ):
-        distance = kwargs.get("distance", "euclidean")
-        
         # get the actual network edges in the region
         reg_act_geom = [g for g in act_geom if g.intersects(region)]
         reg_synt_geom = [g for g in synt_geom if g.intersects(region)]
@@ -500,36 +496,32 @@ class FlatNormFixture(unittest.TestCase):
         # get the region surrounding the point of radius eps
         region = self.get_region(point, eps)
 
-        # compute flat norm
-        norm, _, _, w, plot_data = self.compute_region_flatnorm(
-            region, act_geom, synt_geom, lambda_=lamb_,
-            normalized=True, plot=True
-            )
-        
         # compute hausdorff distance
         hd, hd_geom = self.compute_region_hausdorff(
-            self.get_region(point, eps),
-            act_geom, synt_geom,
-            distance = "geodesic",
+            region, act_geom, synt_geom,
+            distance = kwargs.get("distance", "euclidean"),
             )
-        plot_data["hd_geom"] = hd_geom
         
-        # plot flat norm
-        plot_result = kwargs.get("plot_result", True)
-        kwargs.update(plot_data)
-        kwargs.update(
-            dict(
-                fnorm=norm, 
-                hd=hd, 
-                w=w
-            )
-        )
-        if plot_result:
-            self.plot_triangulated_region_flatnorm(
-                epsilon=eps, lambda_=lamb_,
+        # compute flat norm
+        if plot := kwargs.get("plot", False):
+            norm, _, _, w, plot_data = self.compute_region_flatnorm(
+                region, act_geom, synt_geom, lambda_=lamb_,
                 **kwargs
                 )
-        return norm, hd, w
+            plot_data["hd_geom"] = hd_geom
+            plot_data.update(
+                dict(
+                    hd_geom = hd_geom, lambda_ = lamb_, epsilon = eps,
+                    fnorm = norm, hd = hd, w = w
+                )
+            )
+            return norm, hd, w, plot_data
+        else:
+            norm, _, _, w = self.compute_region_flatnorm(
+                region, act_geom, synt_geom, lambda_=lamb_,
+                **kwargs
+                )
+            return norm, hd, w
 
     def plot_regions_list(
             self,
@@ -620,7 +612,8 @@ class FlatNormFixture(unittest.TestCase):
         # get the title
         title = ", ".join([titles[t_name] for t_name in title_keys])
         if no_ax:
-            to_file = f"{self.fig_dir}/{to_file}.png"
+            if to_file:
+                to_file = f"{self.fig_dir}/{to_file}.png"
             suptitle = f"{title}"
             if suptitle_pfx := kwargs.get('suptitle_pfx'):
                 suptitle = f"{suptitle_pfx} : {suptitle}"
@@ -631,6 +624,11 @@ class FlatNormFixture(unittest.TestCase):
         if do_return:
             return fig, axs
         pass
+
+    def plot_perturbed_network(self,
+
+    ):
+        return
     
 
     def plot_region_flatnorm_lines(

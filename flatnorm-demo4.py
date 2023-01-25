@@ -46,11 +46,10 @@ ind_label = {
     930: 'ex4'
     }
 
-# compute flat norm and hausdorff
 
 # parameters
 epsilon = 1e-3
-lambda_ = 1000
+lambda_ = 1e-3
 
 
 # compute stats
@@ -63,13 +62,19 @@ for ind in ind_label:
     pt = Point(struct["vertices"][ind])
     region_ID = ind_label[ind]
     region = fx.get_region(pt, epsilon)
-    norm, hd, w = fx.compute_region_metric(
+    norm, hd, w, plot_data = fx.compute_region_metric(
         act_geom, synt_geom,
-        pt, epsilon, lambda_, 
-        plot_result=True, show = False, 
-        show_figs = ["haus", "fn"], 
-        to_file = f"{fx.area}-L{lambda_}_fn_region_{region_ID}", 
-        figsize=(26,14), legend_location = "upper left", 
+        pt, epsilon, lambda_,
+        plot = True, distance="geodesic",
+        normalized = True, verbose=False
+        )
+    
+    fx.plot_triangulated_region_flatnorm(
+        show_figs=["haus","fn"], 
+        show=False, do_return=False,
+        to_file=f"{fx.area}-L{lambda_}_fn_region_{region_ID}",
+        legend_location = "upper left",
+        **plot_data, 
         )
 
     # store the data
