@@ -30,12 +30,11 @@ from libs.pyFlatNormlib import get_structure
 fx = FlatNormFixture('runTest')
 fx.out_dir = "out/test"
 fx.fig_dir = "figs/test"
-
+fx.area = 'mcbryde'
 
 
 # read geometries
-area = 'mcbryde'
-act_geom, synt_geom, hull = fx.read_networks(area)
+act_geom, synt_geom, hull = fx.read_networks()
 struct = get_structure(act_geom)
 
 
@@ -69,7 +68,7 @@ for ind in ind_label:
         pt, epsilon, lambda_, 
         plot_result=True, show = False, 
         show_figs = ["haus", "fn"], 
-        to_file = f"{area}-L{lambda_}_fn_region_{region_ID}", 
+        to_file = f"{fx.area}-L{lambda_}_fn_region_{region_ID}", 
         figsize=(26,14), legend_location = "upper left", 
         )
 
@@ -86,7 +85,7 @@ for ind in ind_label:
     
 
 df = pd.DataFrame(flatnorm_data)
-filename = f"{area}-L{lambda_}_FN_STAT_INDEX"
+filename = f"{fx.area}-L{lambda_}_FN_STAT_INDEX"
 with open(f"{fx.out_dir}/{filename}.csv", "w") as outfile:
     df.to_csv(outfile, sep=",", index=False,
               header=True, quoting=csv.QUOTE_NONNUMERIC)

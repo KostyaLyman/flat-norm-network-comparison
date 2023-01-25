@@ -94,6 +94,7 @@ class FlatNormFixture(unittest.TestCase):
         self.synt_path = "./input/primnet"
         self._out_dir = "out"
         self._fig_dir = "figs"
+        self.area = 'mcbryde'
 
         self.area_codes = {
             'mcbryde': [150692, 150724],
