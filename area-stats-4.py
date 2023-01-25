@@ -44,27 +44,27 @@ ind_label = {
     }
 
 lambda_ = 0.001
-max_radius = 20
-num_networks = 1000
+radius_list = [10, 20, 30, 40, 50]
+num_networks = 10
 df_fn, df_ind = fx.read_stability_stats(
-    f"{area}-L{lambda_}_FN_STABILITY_STAT_OUTLIER_N{num_networks}_MAXRAD{max_radius}",
+    f"{area}-L{lambda_}_FN_STABILITY_STAT_OUTLIER_N{num_networks}_R{len(radius_list)}",
     f"{area}-L{lambda_}_FN_STAT_INDEX",
     in_dir=fx.out_dir)
 
 
 
-
+L = len(radius_list)
 
 for i,index in enumerate(ind_label):
-    fig, axs = plt.subplots(1, 1, figsize=(14, 14), constrained_layout=True)
+    fig, axs = plt.subplots(1, L, figsize=(L*12, 12), constrained_layout=True)
     fn_means, hd_means, fn_index, hd_index = list(), list(), list(), list()
     
-    
-    fni, hdi = fx.plot_stability_outlier(
-        df_fn, df_ind, index, ax=axs,
-        xylabel_fontsize=25, tick_fontsize=30,
-        scatter_size=500,
-    )
+    for e,radius in enumerate(radius_list):
+        fni, hdi = fx.plot_stability_outlier(
+            df_fn, df_ind, index, radius = radius, ax=axs[e],
+            xylabel_fontsize=25, tick_fontsize=30,
+            scatter_size=500,
+        )
     
     fnm_prefix = f"(${HAUS}$,${FNN}$) for perturbed networks in region {ind_label[index]}"
     region_original = f"original ${FNN}={fni:0.3g}$, ${HAUS}={hdi:0.3g}$"

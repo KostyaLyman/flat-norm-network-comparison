@@ -55,7 +55,7 @@ def get_perturbed_verts(vertices, radius, perturb_index=None):
     phi = (180/np.pi) * (radius/R)
     
     # Sample vertices from the radius of existing vertices
-    r = phi * np.sqrt(np.random.uniform(size=(n,)))
+    r = phi
     theta = np.random.uniform(size=(n,)) * 2 * np.pi
     dx = r * np.cos(theta)
     dy = r * np.sin(theta)
@@ -66,6 +66,7 @@ def get_perturbed_verts(vertices, radius, perturb_index=None):
     else:
         perturb = np.zeros(shape=(n,))
         perturb[perturb_index] = 1
+    
     return vertices + (np.diag(perturb) @ np.vstack((dx,dy)).T)
 
 def variant_geometry(geometry, radius=10, N=1):
@@ -78,6 +79,7 @@ def variant_geometry(geometry, radius=10, N=1):
     for i in range(N):
         # Get perturbed vertices
         perturb_index = np.random.randint(low=0, high=n, size=(1,))
+        
         new_verts = get_perturbed_verts(
             struct["vertices"], radius, 
             perturb_index=perturb_index
@@ -93,8 +95,8 @@ act_geom, synth_geom, hull = fx.read_networks(area)
 struct = get_structure(act_geom)
 
 # parameters
-num_networks = 1000
-max_radius_list = [20]
+num_networks = 10
+radius_list = [10, 20, 30, 40, 50]
 epsilon = 1e-3
 lambda_ = 1e-3
 
@@ -107,8 +109,8 @@ flatnorm_stability_data = {
 
 # Construct perturbed synthetic network
 np.random.seed(123)
-for max_radius in max_radius_list:
-    sgeom_list = variant_geometry(synth_geom, radius=max_radius, N=num_networks)
+for radius in radius_list:
+    sgeom_list = variant_geometry(synth_geom, radius=radius, N=num_networks)
     # compute flat norm and append to statistics disctionary
     for ind in ind_label:
         point = Point(struct["vertices"][ind])
@@ -132,7 +134,7 @@ for max_radius in max_radius_list:
                 )
             
             # Update statistics
-            flatnorm_stability_data['radius'].append(max_radius)
+            flatnorm_stability_data['radius'].append(radius)
             flatnorm_stability_data['index'].append(ind)
             flatnorm_stability_data['flatnorms'].append(norm)
             flatnorm_stability_data['input_ratios'].append(w/epsilon)
@@ -155,7 +157,7 @@ print("-------------------------------------------------------------------------
 
 
 
-file_name = f"{area}-L{lambda_}_FN_STABILITY_STAT_OUTLIER_N{num_networks}_MAXRAD{max_radius}"
+file_name = f"{area}-L{lambda_}_FN_STABILITY_STAT_OUTLIER_N{num_networks}_R{len(radius_list)}"
 import csv
 with open(f"{fx.out_dir}/{file_name}.csv", "w") as outfile:
     df_stability.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)

@@ -19,10 +19,8 @@ import shapely.geometry as sg
 
 
 workpath = os.getcwd()
-libpath = workpath + "/libs/"
-sys.path.append(libpath)
 
-from pyFlatNormFixture import FlatNormFixture
+from libs.pyFlatNormFixture import FlatNormFixture
 
 
 area_name = {

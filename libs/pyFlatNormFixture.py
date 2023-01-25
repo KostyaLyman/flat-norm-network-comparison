@@ -423,7 +423,6 @@ class FlatNormFixture(unittest.TestCase):
             lambda_=1000,
             normalized=False,
             **kwargs
-            # verbose=False, plot=False, old_impl=False
     ):
         """
         :returns:  flatnorm, enorm, tnorm, input_length, [plot_data if plot==True]
@@ -492,6 +491,45 @@ class FlatNormFixture(unittest.TestCase):
                                         distance=distance)
         return hd, hd_geom
 
+    def compute_region_metric(
+            self, act_geom, synt_geom, 
+            point, eps, lamb_, 
+            **kwargs
+            ):
+        # get the region surrounding the point of radius eps
+        region = self.get_region(point, eps)
+
+        # compute flat norm
+        norm, _, _, w, plot_data = self.compute_region_flatnorm(
+            region, act_geom, synt_geom, lambda_=lamb_,
+            normalized=True, plot=True
+            )
+        
+        # compute hausdorff distance
+        hd, hd_geom = self.compute_region_hausdorff(
+            self.get_region(point, eps),
+            act_geom, synt_geom,
+            distance = "geodesic",
+            )
+        plot_data["hd_geom"] = hd_geom
+        
+        # plot flat norm
+        plot_result = kwargs.get("plot_result", True)
+        kwargs.update(plot_data)
+        kwargs.update(
+            dict(
+                fnorm=norm, 
+                hd=hd, 
+                w=w
+            )
+        )
+        if plot_result:
+            self.plot_triangulated_region_flatnorm(
+                epsilon=eps, lambda_=lamb_,
+                **kwargs
+                )
+        return norm, hd, w
+
     def plot_regions_list(
             self,
             act_geom, synt_geom, regions_list, area=None,
@@ -537,7 +575,7 @@ class FlatNormFixture(unittest.TestCase):
             self, triangulated, T1, T2,
             echain, tchain,
             epsilon, lambda_,
-            fnorm=None,
+            fnorm=None, hd=None, w=None,
             show_figs = ["input", "fn"],
             ax=None, to_file=None, show=True,
             **kwargs
@@ -549,10 +587,17 @@ class FlatNormFixture(unittest.TestCase):
         hd_geom = kwargs.get("hd_geom", None)
         location = kwargs.get("legend_location", "best")
 
+        # Titles for the plot or plots
+        titles = {
+            'lambda': f"$\\lambda = {lambda_:0.4f}$",
+            'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
+            'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
+            'fn': f"${FNN}={fnorm:0.3g}$",
+            'haus': f"${HAUS}={hd:0.3g}$"
+        }
+        title_keys = ['epsilon', 'ratio']
+
         # ---- PLOT ----
-        # fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, 2), **kwargs)
-        # fnorm_title = f"Flat norm scale, $\\lambda$ = {lambda_:d}" if not fnorm \
-        #     else f"$\\lambda = {lambda_:d}$, ${FNN}={fnorm:0.3g}$"
         fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, len(show_figs)), **kwargs)
         for i,figure in enumerate(show_figs):
             if figure == "input":
@@ -563,18 +608,21 @@ class FlatNormFixture(unittest.TestCase):
             elif figure == "fn":
                 plot_norm(triangulated, echain, tchain, axs[i], 
                           region_bound=region)
+                title_keys.extend(['lambda', 'fn'])
             elif figure == "haus":
                 plot_triangulation(triangulated, T1, T2, axs[i], 
                                    show_triangulation=False, 
                                    hd_geom = hd_geom,
                                    region_bound=region, 
                                    legend=True, location=location)
-
+                title_keys.append('haus')
+        # get the title
+        title = ", ".join([titles[t_name] for t_name in title_keys])
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
-            suptitle = ""
-            if suptitle := kwargs.get('suptitle'):
-                suptitle = f"{suptitle}"
+            suptitle = f"{title}"
+            if suptitle_pfx := kwargs.get('suptitle_pfx'):
+                suptitle = f"{suptitle_pfx} : {suptitle}"
 
             fig.suptitle(suptitle, fontsize=fontsize + 8)
             close_fig(fig, to_file, show, bbox_inches='tight')

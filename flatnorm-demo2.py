@@ -23,9 +23,9 @@ rootpath = os.path.dirname(workpath)
 figpath = workpath + "/figs/"
 
 
-from pyFlatNormlib import get_geometry, get_current, msfn, perform_triangulation
-from pyDrawNetworklib import plot_norm, plot_input, plot_failed_triangulation
-from pyDrawNetworklib import plot_intermediate_result, plot_triangulation
+from libs.pyFlatNormlib import get_geometry, get_current, msfn, perform_triangulation
+from libs.pyDrawNetworklib import plot_norm, plot_input, plot_failed_triangulation
+from libs.pyDrawNetworklib import plot_intermediate_result, plot_triangulation
 
 
 # Input geometries
