@@ -123,7 +123,7 @@ for radius in radius_list:
         # Compute local flat norm for perturbed networks
         for i in tqdm(range(len(sgeom_list)), 
             desc="Multiple perturbations with outliers",
-            ncols = 100,
+            ncols = 100, position=0, leave=True
             ):
             norm, hd, w = fx.compute_region_metric(
                 act_geom, sgeom_list[i], point, epsilon, lambda_,
