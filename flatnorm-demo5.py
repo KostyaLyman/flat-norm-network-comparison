@@ -33,8 +33,8 @@ fx.out_dir = "out/stability"
 fx.fig_dir = "figs/stability"
 
 # read geometries
-area = 'mcbryde'
-actual_geom, synthetic_geom, hull = fx.read_networks(area)
+fx.area = 'mcbryde'
+actual_geom, synthetic_geom, hull = fx.read_networks()
 act_struct = get_structure(actual_geom)
 
 
@@ -100,18 +100,40 @@ num_networks = 1
 rad = 20
 
 
-for ind in ind_label:
-    pt = Point(act_struct["vertices"][ind])
-    region_ID = ind_label[ind]
-    region = fx.get_region(pt, epsilon)
+# for ind in ind_label:
+pt = Point(act_struct["vertices"][ind])
+region_ID = ind_label[ind]
+region = fx.get_region(pt, epsilon)
 
-    sgeom_list = variant_geometry(synthetic_geom, region, radius=rad, N=num_networks)
-    
-    for synt_geom in sgeom_list:
-        norm, hd, w = fx.compute_region_metric(
-            actual_geom, synt_geom,
-            pt, epsilon, lambda_,
-            plot = False, distance="geodesic",
-            normalized = True, verbose=False
-            )
+# original without perturbation
+norm, hd, w, plot_data = fx.compute_region_metric(
+    actual_geom, synthetic_geom,
+    pt, epsilon, lambda_,
+    plot = True, distance="geodesic",
+    normalized = True, verbose=False
+    )
+
+all_plot_data = [plot_data]
+
+sgeom_list = variant_geometry(synthetic_geom, region, radius=rad, N=num_networks)
+
+for i, synt_geom in enumerate(sgeom_list):
+    norm, hd, w, plot_data = fx.compute_region_metric(
+        actual_geom, synt_geom,
+        pt, epsilon, lambda_,
+        plot = True, distance="geodesic",
+        normalized = True, verbose=False
+        )
+
+    all_plot_data.append(plot_data)
+
+# Generate the plot
+fx.plot_multiple_triangulated_region_flatnorm( 
+    all_plot_data, show_figs = ["haus", "fn"], 
+    to_file = f"{fx.area}-L{lambda_}_outlier_N{num_networks}_radius{rad}", 
+    suptitle = f"Perturbed networks with outliers with a maximum displacement of {rad} meters",
+    show = True,
+    figsize=(32,32)
+)
+
 

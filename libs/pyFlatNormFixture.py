@@ -508,7 +508,6 @@ class FlatNormFixture(unittest.TestCase):
                 region, act_geom, synt_geom, lambda_=lamb_,
                 **kwargs
                 )
-            plot_data["hd_geom"] = hd_geom
             plot_data.update(
                 dict(
                     hd_geom = hd_geom, lambda_ = lamb_, epsilon = eps,
@@ -592,6 +591,7 @@ class FlatNormFixture(unittest.TestCase):
 
         # ---- PLOT ----
         fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, len(show_figs)), **kwargs)
+        
         for i,figure in enumerate(show_figs):
             if figure == "input":
                 plot_triangulation(triangulated, T1, T2, axs[i], 
@@ -625,11 +625,93 @@ class FlatNormFixture(unittest.TestCase):
             return fig, axs
         pass
 
-    def plot_perturbed_network(self,
+    def plot_multiple_triangulated_region_flatnorm(
+            self, 
+            all_plot_data : list,
+            show_figs : list = ["input", "fn"],
+            ax=None, 
+            to_file : str =None, 
+            show : bool =True,
+            **kwargs
+        ):
+        kwargs.setdefault('figsize', (26, 16))
+        fontsize = kwargs.get('fontsize', 30)
+        location = kwargs.get("legend_location", "best")
+        do_return = kwargs.get('do_return', False)
 
-    ):
-        return
-    
+        fig, axs, no_ax = get_fig_from_ax( 
+            ax, ndim=(len(all_plot_data), len(show_figs)), 
+            **kwargs)
+
+        # Iterate over each plotdata
+        for i,plot_kwargs in enumerate(all_plot_data):
+            if i == 0:
+                title_pfx = "original"
+            else:
+                title_pfx = f"perturbed {i}"
+
+            triangulated = plot_kwargs["triangulated"]
+            T1=plot_kwargs["T1"]
+            T2=plot_kwargs["T2"]
+            echain=plot_kwargs["echain"]
+            tchain=plot_kwargs["tchain"]
+            region=plot_kwargs["region"]
+            hd_geom = plot_kwargs["hd_geom"]
+            lambda_ = plot_kwargs["lambda_"]
+            epsilon = plot_kwargs["epsilon"]
+            fnorm = plot_kwargs["fnorm"]
+            hd = plot_kwargs["hd"]
+            w = plot_kwargs["w"]
+            
+            # Titles for the plot or plots
+            titles = {
+                'lambda': f"$\\lambda = {lambda_:0.4f}$",
+                'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
+                'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
+                'fn': f"${FNN}={fnorm:0.3g}$",
+                'haus': f"${HAUS}={hd:0.3g}$"
+                }
+
+            # ---- PLOT ----
+            for j,figure in enumerate(show_figs):
+                if figure == "input":
+                    plot_triangulation(triangulated, T1, T2, axs[i,j], 
+                                    show_triangulation=False, 
+                                    region_bound=region, 
+                                    legend=True, location=location)
+                    title_keys = ['epsilon', 'ratio']
+                elif figure == "fn":
+                    plot_norm(triangulated, echain, tchain, axs[i,j], 
+                            region_bound=region)
+                    title_keys = ['lambda', 'fn']
+                elif figure == "haus":
+                    plot_triangulation(triangulated, T1, T2, axs[i,j], 
+                                    show_triangulation=False, 
+                                    hd_geom = hd_geom,
+                                    region_bound=region, 
+                                    legend=True, location=location)
+                    title_keys = ['epsilon', 'ratio', 'haus'] if "input" not in show_figs else ["haus"]
+                
+                # Title for the plot
+                title = ", ".join([titles[t_name] for t_name in title_keys])
+                if j==0:
+                    title = f"{title_pfx} : {title}"
+                axs[i,j].set_title(title, fontsize=fontsize)
+            
+            
+        # get the super title
+        if no_ax:
+            if to_file:
+                to_file = f"{self.fig_dir}/{to_file}.png"
+            if suptitle := kwargs.get('suptitle'):
+                fig.suptitle(suptitle, fontsize=fontsize + 8)
+
+            close_fig(fig, to_file, show, bbox_inches='tight')
+        
+
+        if do_return:
+            return fig, axs
+        pass
 
     def plot_region_flatnorm_lines(
             self, epsilons, lambdas, flatnorms,
@@ -1197,8 +1279,8 @@ class FlatNormFixture(unittest.TestCase):
         ax.axvline(index_hd, linestyle='dashed',color=colors['haus_region'],linewidth=3)
         ax.axhline(index_fn, linestyle='dashed',color=colors['fn_region'],linewidth=3)
 
-        ylim = kwargs.get("set_ylim", [0.25, 0.40])
-        ax.set_ylim(bottom=ylim[0], top=ylim[1])
+        # ylim = kwargs.get("set_ylim", [0.25, 0.40])
+        # ax.set_ylim(bottom=ylim[0], top=ylim[1])
 
         # plot config -------------------------------------------------------------
         ax.set_xlabel(f"Hausdorff distance ${HAUS}$", 
