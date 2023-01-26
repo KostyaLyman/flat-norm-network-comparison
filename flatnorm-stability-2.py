@@ -14,7 +14,7 @@ import numpy as np
 from shapely.geometry import Point, LineString
 import pandas as pd
 import csv
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
