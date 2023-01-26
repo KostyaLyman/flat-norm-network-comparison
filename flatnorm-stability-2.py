@@ -13,6 +13,8 @@ import sys, os
 import numpy as np
 from shapely.geometry import Point, LineString
 import pandas as pd
+import csv
+from tqdm import tqdm
 
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
@@ -46,7 +48,7 @@ ind_label = {
     }
 
 
-#%% Perturbations
+# Perturbations
 
 def get_perturbed_verts(vertices, radius, perturb_index=None):
     n = vertices.shape[0]
@@ -69,16 +71,17 @@ def get_perturbed_verts(vertices, radius, perturb_index=None):
     
     return vertices + (np.diag(perturb) @ np.vstack((dx,dy)).T)
 
-def variant_geometry(geometry, radius=10, N=1):
+def variant_geometry(geometry, region, radius=10, N=1):
     # Get the vertices and line segments
     struct = get_structure(geometry)
     
-    # Get the new networks
-    n = struct["vertices"].shape[0]
+    # Get the vertices within region
+    vert_ind = [i for i,p in enumerate(struct["vertices"]) if Point(p).within(region)]
+
     new_geom = []
     for i in range(N):
         # Get perturbed vertices
-        perturb_index = np.random.randint(low=0, high=n, size=(1,))
+        perturb_index = np.random.choice(vert_ind, size=(1,))
         
         new_verts = get_perturbed_verts(
             struct["vertices"], radius, 
@@ -90,12 +93,12 @@ def variant_geometry(geometry, radius=10, N=1):
                     for i,j in struct["segments"]])
     return new_geom
 
-#%% compute flat norm
+# compute flat norm
 act_geom, synth_geom, hull = fx.read_networks(area)
 struct = get_structure(act_geom)
 
 # parameters
-num_networks = 10
+num_networks = 1000
 radius_list = [10, 20, 30, 40, 50]
 epsilon = 1e-3
 lambda_ = 1e-3
@@ -110,28 +113,24 @@ flatnorm_stability_data = {
 # Construct perturbed synthetic network
 np.random.seed(123)
 for radius in radius_list:
-    sgeom_list = variant_geometry(synth_geom, radius=radius, N=num_networks)
+    
     # compute flat norm and append to statistics disctionary
     for ind in ind_label:
         point = Point(struct["vertices"][ind])
         region = fx.get_region(point, epsilon)
+        sgeom_list = variant_geometry(synth_geom, region, radius=radius, N=num_networks)
         
         # Compute local flat norm for perturbed networks
-        for syn_geom in sgeom_list:
-            norm, enorm, tnorm, w = fx.compute_region_flatnorm(
-                    region,
-                    act_geom, syn_geom,
-                    lambda_=lambda_,
-                    normalized=True,
-                    plot=False
-                )
-
-            # compute hausdorff distance
-            hd, _ = fx.compute_region_hausdorff(
-                fx.get_region(point, epsilon),
-                act_geom, syn_geom,
-                distance = "geodesic",
-                )
+        for i in tqdm(range(len(sgeom_list)), 
+            desc="Multiple perturbations with outliers",
+            ncols = 100,
+            ):
+            norm, hd, w = fx.compute_region_metric(
+                act_geom, sgeom_list[i], point, epsilon, lambda_,
+                plot = False,
+                verbose=False, normalized = True,
+                distance="geodesic" 
+            )
             
             # Update statistics
             flatnorm_stability_data['radius'].append(radius)
@@ -158,7 +157,7 @@ print("-------------------------------------------------------------------------
 
 
 file_name = f"{area}-L{lambda_}_FN_STABILITY_STAT_OUTLIER_N{num_networks}_R{len(radius_list)}"
-import csv
+
 with open(f"{fx.out_dir}/{file_name}.csv", "w") as outfile:
     df_stability.to_csv(outfile, sep=",", index=False, header=True, quoting=csv.QUOTE_NONNUMERIC)
 

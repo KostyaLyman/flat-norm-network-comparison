@@ -34,7 +34,8 @@ def lp_solver(c, cons, b):
     c = matrix(c)
     cons = spmatrix(cons.data.tolist(), cons.row, cons.col, cons.shape, tc='d')
     b = matrix(b,(len(b),1),'d')
-    sol = solvers.lp(c, G, h, cons, b, solver='glpk')
+    sol = solvers.lp(c, G, h, cons, b, solver='glpk',
+                    options={'glpk':{'msg_lev':'GLP_MSG_OFF'}})
     sol_x = np.array(sol['x'])
     objective_value = sol['primal objective']
     return sol_x, objective_value

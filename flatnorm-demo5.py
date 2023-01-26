@@ -4,13 +4,14 @@ Created on Thu Oct 20 11:45:25 2022
 
 Author: Rounak Meyur
 
-Description: Chooses particular regions in a geographic location to compare the
-networks inside it.
+Description: Displays impact of perturbation on the nodes of a network
 """
 
 import sys, os
 from shapely.geometry import Point, LineString
 import numpy as np
+import pandas as pd
+import csv
 
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
@@ -34,7 +35,7 @@ fx.fig_dir = "figs/stability"
 # read geometries
 area = 'mcbryde'
 actual_geom, synthetic_geom, hull = fx.read_networks(area)
-struct = get_structure(actual_geom)
+act_struct = get_structure(actual_geom)
 
 
 # label defnitions
@@ -55,7 +56,7 @@ def get_perturbed_verts(vertices, radius, perturb_index=None):
     phi = (180/np.pi) * (radius/R)
     
     # Sample vertices from the radius of existing vertices
-    r = phi
+    r = phi * np.sqrt(np.random.uniform(size=(n,)))
     theta = np.random.uniform(size=(n,)) * 2 * np.pi
     dx = r * np.cos(theta)
     dy = r * np.sin(theta)
@@ -69,16 +70,17 @@ def get_perturbed_verts(vertices, radius, perturb_index=None):
     
     return vertices + (np.diag(perturb) @ np.vstack((dx,dy)).T)
 
-def variant_geometry(geometry, radius=10, N=1):
+def variant_geometry(geometry, region, radius=10, N=1):
     # Get the vertices and line segments
     struct = get_structure(geometry)
     
-    # Get the new networks
-    n = struct["vertices"].shape[0]
+    # Get the vertices within region
+    vert_ind = [i for i,p in enumerate(struct["vertices"]) if Point(p).within(region)]
+
     new_geom = []
     for i in range(N):
         # Get perturbed vertices
-        perturb_index = np.random.randint(low=0, high=n, size=(1,))
+        perturb_index = np.random.choice(vert_ind, size=(1,))
         
         new_verts = get_perturbed_verts(
             struct["vertices"], radius, 
@@ -90,34 +92,26 @@ def variant_geometry(geometry, radius=10, N=1):
                     for i,j in struct["segments"]])
     return new_geom
 
-# compute flat norm
 
-# parameters
 epsilon = 1e-3
 lambda_ = 1e-3
-
-# fn_list = []
-# hd_list = []
-# w_list = []
-
-
+ind = 994
+num_networks = 1
+rad = 20
 
 
 for ind in ind_label:
-    
-    pt = Point(struct["vertices"][ind])
+    pt = Point(act_struct["vertices"][ind])
     region_ID = ind_label[ind]
     region = fx.get_region(pt, epsilon)
-    fn, hd, w, plot_data = fx.compute_region_metric(
-        actual_geom, synthetic_geom,
-        pt, epsilon, lambda_,
-        plot=True 
-        )
-    
 
+    sgeom_list = variant_geometry(synthetic_geom, region, radius=rad, N=num_networks)
     
-    # sgeom_list = variant_geometry(synthetic_geom, radius=2000, N=1)
-    
-    
-
+    for synt_geom in sgeom_list:
+        norm, hd, w = fx.compute_region_metric(
+            actual_geom, synt_geom,
+            pt, epsilon, lambda_,
+            plot = False, distance="geodesic",
+            normalized = True, verbose=False
+            )
 
