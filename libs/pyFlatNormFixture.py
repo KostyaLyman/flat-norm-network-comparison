@@ -648,7 +648,7 @@ class FlatNormFixture(unittest.TestCase):
             if i == 0:
                 title_pfx = "original"
             else:
-                title_pfx = f"perturbed {i}"
+                title_pfx = "perturbed"
 
             triangulated = plot_kwargs["triangulated"]
             T1=plot_kwargs["T1"]
@@ -690,7 +690,7 @@ class FlatNormFixture(unittest.TestCase):
                                     hd_geom = hd_geom,
                                     region_bound=region, 
                                     legend=True, location=location)
-                    title_keys = ['epsilon', 'ratio', 'haus'] if "input" not in show_figs else ["haus"]
+                    title_keys = ["haus"]
                 
                 # Title for the plot
                 title = ", ".join([titles[t_name] for t_name in title_keys])
@@ -1195,6 +1195,12 @@ class FlatNormFixture(unittest.TestCase):
                       fontsize=kwargs.get('xylabel_fontsize', 22))
         ax.set_xlim(left=-100, right=100)
         ax.set_ylim(bottom=-100, top=100)
+
+        # ticks -------------------------------------------------------------------
+        tickfontsize = kwargs.get("tick_fontsize", 15)
+        tix = [-90, -60, -30, 0, 30, 60, 90]
+        ax.set_xticks(tix, [f"{t:0.3g}" for t in tix], fontsize=tickfontsize)
+        ax.set_yticks(tix, [f"{t:0.3g}" for t in tix], fontsize=tickfontsize)
         
         
         # mean line ---------------------------------------------------------------
@@ -1210,9 +1216,9 @@ class FlatNormFixture(unittest.TestCase):
 
         title_styles = dict(
             ii=f"region index : ${{index:d}}$",
-            rr=f"max perturb : ${{radius:0.1f}}$ m",
+            rr=f"perturb = ${{radius:0.1f}}$ m",
             ir=f"region index : ${{index:d}}$, max perturb : ${{radius:0.1f}}$ m",
-            ri=f"max perturb : ${{radius:0.1f}}$ m, region index : ${{index:d}}$",
+            ri=f"perturb = ${{radius:0.1f}}$ m, region index : ${{index:d}}$",
         )
         title_style = kwargs.get('title_style', 'rr')
         
@@ -1271,10 +1277,11 @@ class FlatNormFixture(unittest.TestCase):
         )
 
         # ticks -------------------------------------------------------------------
+        tickfontsize = kwargs.get("tick_fontsize", 15)
         ax.set_xticks([index_hd], [f"{index_hd:0.3g}"], color=colors['haus_region'], 
-                      minor=True, fontsize=15)
+                      minor=True, fontsize=tickfontsize)
         ax.set_yticks([index_fn], [f"{index_fn:0.3g}"], color = colors['fn_region'],
-                      minor=True, fontsize=15)
+                      minor=True, fontsize=tickfontsize)
         
         ax.axvline(index_hd, linestyle='dashed',color=colors['haus_region'],linewidth=3)
         ax.axhline(index_fn, linestyle='dashed',color=colors['fn_region'],linewidth=3)

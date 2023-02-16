@@ -44,10 +44,11 @@ ind_label = {
     }
 
 lambda_ = 0.001
-radius_list = [10, 20, 30, 40, 50]
+# radius_list = [10, 20, 30, 40, 50]
+radius_list = [10, 30, 50]
 num_networks = 1000
 df_fn, df_ind = fx.read_stability_stats(
-    f"{area}-L{lambda_}_FN_STABILITY_STAT_OUTLIER_N{num_networks}_R{len(radius_list)}",
+    f"{area}-L{lambda_}_FN_STABILITY_STAT_OUTLIER_N{num_networks}_R5",
     f"{area}-L{lambda_}_FN_STAT_INDEX",
     in_dir=fx.out_dir)
 
@@ -62,13 +63,13 @@ for i,index in enumerate(ind_label):
     for e,radius in enumerate(radius_list):
         fni, hdi = fx.plot_stability_outlier(
             df_fn, df_ind, index, radius = radius, ax=axs[e],
-            xylabel_fontsize=25, tick_fontsize=30,
+            xylabel_fontsize=40, tick_fontsize=35,
             scatter_size=500,
         )
     
     fnm_prefix = f"(${HAUS}$,${FNN}$) for perturbed networks in region {ind_label[index]}"
     region_original = f"original ${FNN}={fni:0.3g}$, ${HAUS}={hdi:0.3g}$"
-    fig.suptitle(f"{fnm_prefix}  :  {region_original}", fontsize=70)
+    fig.suptitle(f"{fnm_prefix}  :  {region_original}", fontsize=50)
 
-    file_name = f"{fx.area}-L{lambda_}_stability_outlier_{ind_label[index]}"
+    file_name = f"{fx.area}-L{lambda_}_stability_outlier_{ind_label[index]}_selected"
     close_fig(fig, to_file=f"{fx.fig_dir}/{file_name}.png", show=False)

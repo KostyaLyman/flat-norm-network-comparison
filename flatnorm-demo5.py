@@ -10,8 +10,7 @@ Description: Displays impact of perturbation on the nodes of a network
 import sys, os
 from shapely.geometry import Point, LineString
 import numpy as np
-import pandas as pd
-import csv
+
 
 
 FN = FLAT_NORM = "\\mathbb{{F}}_{{\\lambda}}"
@@ -23,7 +22,7 @@ MIN_X, MIN_Y, MAX_X, MAX_Y = 0, 1, 2, 3
 workpath = os.getcwd()
 sys.path.append(workpath+'/libs/')
 
-from libs.pyFlatNormFixture import FlatNormFixture, get_fig_from_ax, close_fig
+from libs.pyFlatNormFixture import FlatNormFixture
 from libs.pyFlatNormlib import get_structure
 
 
@@ -41,63 +40,16 @@ act_struct = get_structure(actual_geom)
 # label defnitions
 ind_label = {
     994: 'ex1',
-    # 1003:'ex2',
+    1003:'ex2',
     # 967: 'ex3',
     # 930: 'ex4'
     }
 
 
-
-# Perturbation functions
-def get_perturbed_verts(vertices, radius, perturb_index=None):
-    n = vertices.shape[0]
-    # Get the deviation radius in degrees
-    R = 6378100
-    phi = (180/np.pi) * (radius/R)
-    
-    # Sample vertices from the radius of existing vertices
-    r = phi * np.sqrt(np.random.uniform(size=(n,)))
-    theta = np.random.uniform(size=(n,)) * 2 * np.pi
-    dx = r * np.cos(theta)
-    dy = r * np.sin(theta)
-
-    # Selectively perturb particular vertices
-    if not perturb_index:
-        perturb = np.ones(shape=(n,))
-    else:
-        perturb = np.zeros(shape=(n,))
-        perturb[perturb_index] = 1
-    
-    return vertices + (np.diag(perturb) @ np.vstack((dx,dy)).T)
-
-def variant_geometry(geometry, region, radius=10, N=1):
-    # Get the vertices and line segments
-    struct = get_structure(geometry)
-    
-    # Get the vertices within region
-    vert_ind = [i for i,p in enumerate(struct["vertices"]) if Point(p).within(region)]
-
-    new_geom = []
-    for i in range(N):
-        # Get perturbed vertices
-        perturb_index = np.random.choice(vert_ind, size=(1,))
-        
-        new_verts = get_perturbed_verts(
-            struct["vertices"], radius, 
-            perturb_index=perturb_index
-            )
-    
-        # get the updated geometries
-        new_geom.append([LineString((Point(new_verts[i]), Point(new_verts[j]))) \
-                    for i,j in struct["segments"]])
-    return new_geom
-
-
 epsilon = 1e-3
 lambda_ = 1e-3
 ind = 994
-num_networks = 1
-rad = 20
+
 
 
 # for ind in ind_label:
@@ -115,25 +67,44 @@ norm, hd, w, plot_data = fx.compute_region_metric(
 
 all_plot_data = [plot_data]
 
-sgeom_list = variant_geometry(synthetic_geom, region, radius=rad, N=num_networks)
 
-for i, synt_geom in enumerate(sgeom_list):
-    norm, hd, w, plot_data = fx.compute_region_metric(
-        actual_geom, synt_geom,
-        pt, epsilon, lambda_,
-        plot = True, distance="geodesic",
-        normalized = True, verbose=False
-        )
 
-    all_plot_data.append(plot_data)
+# create variant synthetic geometry
+R = 6378100
+phi = lambda rad: (180/np.pi) * (rad/R)
+
+syn_struct = get_structure(synthetic_geom)
+
+vert_ind = [i for i,p in enumerate(syn_struct["vertices"]) if Point(p).within(region)]
+n = syn_struct["vertices"].shape[0]
+perturb_index = vert_ind[3]
+
+dx = np.zeros(shape=(n,))
+dy = np.zeros(shape=(n,))
+dx[perturb_index] = phi(-90)
+dy[perturb_index] = phi(-170)
+new_verts = syn_struct["vertices"] + np.vstack((dx,dy)).T
+
+synt_geom = [LineString((Point(new_verts[i]), Point(new_verts[j]))) \
+            for i,j in syn_struct["segments"]]
+
+# compute the flatnorm and hausdorff distance 
+norm, hd, w, plot_data = fx.compute_region_metric(
+    actual_geom, synt_geom,
+    pt, epsilon, lambda_,
+    plot = True, distance="geodesic",
+    normalized = True, verbose=False
+    )
+all_plot_data.append(plot_data)
 
 # Generate the plot
 fx.plot_multiple_triangulated_region_flatnorm( 
     all_plot_data, show_figs = ["haus", "fn"], 
-    to_file = f"{fx.area}-L{lambda_}_outlier_N{num_networks}_radius{rad}", 
-    suptitle = f"Perturbed networks with outliers with a maximum displacement of {rad} meters",
+    to_file = f"{fx.area}-L{lambda_}_outlier", 
+    suptitle = "Impact of outliers on Hausdorff and flat norm metrics",
+    fontsize=50,
     show = True,
-    figsize=(32,32)
+    figsize=(28,30)
 )
 
 
