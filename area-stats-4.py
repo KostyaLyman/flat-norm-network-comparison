@@ -67,7 +67,8 @@ for i,index in enumerate(ind_label):
             scatter_size=500,
         )
     
-    fnm_prefix = f"(${HAUS}$,${FNN}$) for perturbed networks in region {ind_label[index]}"
+    # fnm_prefix = f"(${HAUS}$,${FNN}$) for perturbed networks in region {ind_label[index]}"
+    fnm_prefix = f"(${HAUS}$,${FNN}$) for perturbed networks with outliers"
     region_original = f"original ${FNN}={fni:0.3g}$, ${HAUS}={hdi:0.3g}$"
     fig.suptitle(f"{fnm_prefix}  :  {region_original}", fontsize=50)
 
