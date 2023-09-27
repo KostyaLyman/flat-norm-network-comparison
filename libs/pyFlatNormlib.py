@@ -14,9 +14,9 @@ from scipy import sparse
 from shapely.geometry import LineString, Point, MultiLineString
 import triangle as tr
 
-from pyUtilslib import simpvol, boundary_matrix
-from pyLPsolverlib import lp_solver
-from pyGeometrylib import geodist
+from libs.pyUtilslib import simpvol, boundary_matrix
+from libs.pyLPsolverlib import lp_solver
+from libs.pyGeometrylib import geodist
 
 from timeit import default_timer as timer
 from datetime import timedelta

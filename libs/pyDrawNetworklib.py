@@ -314,16 +314,16 @@ def plot_triangulation(tri_struct, t1, t2, ax, **kwargs):
     
     # ---- legend for figure ----
     legend = kwargs.get('legend', False)
-    location = kwargs.get('location', "best")
+    location = kwargs.get('location', "lower right")
     if legend:
-        ax.legend(fontsize=30, markerscale=3, loc=location)
+        ax.legend(fontsize=50, markerscale=3, loc=location)
     return ax
 
 
 def plot_regions(act_geom, syn_geom, geom_regions, ax,  **kwargs):
     highlight = kwargs.get('region_highlight', None)
     highlight = kwargs.get('highlight', highlight)
-    legendsize = kwargs.get('legend_fontsize',25)
+    legendsize = kwargs.get('legend_fontsize',32)
     legmarkscale = kwargs.get('legend_markerscale',2.5)
     plot_colors = dict(
         region=kwargs.get('region_color', 'cyan'),
@@ -474,9 +474,9 @@ def plot_demo_flatnorm(geom, tri_struct, x, s, ax, offset=0.0):
                directed=False)
     draw_polygons(ax, geom_triangles, color='magenta', alpha=0.5)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
-    labels = [r"Input current $T$",
-              r"Flat norm $T-\partial S$",
-              r"Surface area $S$"]
+    labels = [r"Input geometry $T$",
+              r"Geometry $T-\partial S$",
+              r"Area $S$"]
     handles = [Line2D([0], [0], color='blue', linewidth=3.0),
                Line2D([0], [0], color='green', linewidth=3.0),
                Patch(facecolor='magenta', alpha=0.5)]

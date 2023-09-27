@@ -58,14 +58,14 @@ region_ID = ind_label[ind]
 region = fx.get_region(pt, epsilon)
 
 # original without perturbation
-norm, hd, w, plot_data = fx.compute_region_metric(
+norm, hd, w, org_plot_data = fx.compute_region_metric(
     actual_geom, synthetic_geom,
     pt, epsilon, lambda_,
     plot = True, distance="geodesic",
     normalized = True, verbose=False
     )
 
-all_plot_data = [plot_data]
+
 
 
 
@@ -89,22 +89,29 @@ synt_geom = [LineString((Point(new_verts[i]), Point(new_verts[j]))) \
             for i,j in syn_struct["segments"]]
 
 # compute the flatnorm and hausdorff distance 
-norm, hd, w, plot_data = fx.compute_region_metric(
+norm, hd, w, pert_plot_data = fx.compute_region_metric(
     actual_geom, synt_geom,
     pt, epsilon, lambda_,
     plot = True, distance="geodesic",
     normalized = True, verbose=False
     )
-all_plot_data.append(plot_data)
+
 
 # Generate the plot
 fx.plot_multiple_triangulated_region_flatnorm( 
-    all_plot_data, show_figs = ["haus", "fn"], 
-    to_file = f"{fx.area}-L{lambda_}_outlier", 
-    suptitle = "Impact of outliers on Hausdorff and flat norm metrics",
-    fontsize=50,
-    show = True,
-    figsize=(28,30)
+    org_plot_data, show_figs = ["haus", "fn"], 
+    to_file = f"{fx.area}-L{lambda_}_original", 
+    suptitle = "Original networks: Hausdorff and Flatnorm distances",
+    fontsize=45,
+    show = False,
+    figsize=(28,15)
 )
 
-
+fx.plot_multiple_triangulated_region_flatnorm( 
+    pert_plot_data, show_figs = ["haus", "fn"], 
+    to_file = f"{fx.area}-L{lambda_}_perturbed", 
+    suptitle = "Perturbed networks: Hausdorff and Flatnorm distances",
+    fontsize=45,
+    show = False,
+    figsize=(28,15)
+)

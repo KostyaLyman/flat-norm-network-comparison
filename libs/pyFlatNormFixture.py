@@ -567,7 +567,7 @@ class FlatNormFixture(unittest.TestCase):
             self, triangulated, T1, T2,
             echain, tchain,
             epsilon, lambda_,
-            fnorm=None, hd=None, w=None,
+            fnorm=None, w=None,
             show_figs = ["input", "fn"],
             ax=None, to_file=None, show=True,
             **kwargs
@@ -576,7 +576,6 @@ class FlatNormFixture(unittest.TestCase):
         fontsize = kwargs.get('fontsize', 30)
         do_return = kwargs.get('do_return', False)
         region = kwargs.get('region', None)
-        hd_geom = kwargs.get("hd_geom", None)
         location = kwargs.get("legend_location", "best")
 
         # Titles for the plot or plots
@@ -584,31 +583,30 @@ class FlatNormFixture(unittest.TestCase):
             'lambda': f"$\\lambda = {lambda_:0.4f}$",
             'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
             'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
-            'fn': f"${FNN}={fnorm:0.3g}$",
-            'haus': f"${HAUS}={hd:0.3g}$"
+            'fn': f"${FNN}={fnorm:0.3g}$"
         }
-        title_keys = ['epsilon', 'ratio']
+        # title_keys = ['epsilon', 'ratio']
+        title_keys = []
 
         # ---- PLOT ----
         fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1, len(show_figs)), **kwargs)
-        
+
         for i,figure in enumerate(show_figs):
             if figure == "input":
                 plot_triangulation(triangulated, T1, T2, axs[i], 
                                    show_triangulation=False, 
                                    region_bound=region, 
                                    legend=True, location=location)
+            if figure == "triangulated":
+                plot_triangulation(triangulated, T1, T2, axs[i], 
+                                   show_triangulation=True, 
+                                   region_bound=region, 
+                                   legend=False, location=location)
             elif figure == "fn":
                 plot_norm(triangulated, echain, tchain, axs[i], 
                           region_bound=region)
                 title_keys.extend(['lambda', 'fn'])
-            elif figure == "haus":
-                plot_triangulation(triangulated, T1, T2, axs[i], 
-                                   show_triangulation=False, 
-                                   hd_geom = hd_geom,
-                                   region_bound=region, 
-                                   legend=True, location=location)
-                title_keys.append('haus')
+
         # get the title
         title = ", ".join([titles[t_name] for t_name in title_keys])
         if no_ax:
@@ -617,7 +615,6 @@ class FlatNormFixture(unittest.TestCase):
             suptitle = f"{title}"
             if suptitle_pfx := kwargs.get('suptitle_pfx'):
                 suptitle = f"{suptitle_pfx} : {suptitle}"
-
             fig.suptitle(suptitle, fontsize=fontsize + 8)
             close_fig(fig, to_file, show, bbox_inches='tight')
 
@@ -627,7 +624,7 @@ class FlatNormFixture(unittest.TestCase):
 
     def plot_multiple_triangulated_region_flatnorm(
             self, 
-            all_plot_data : list,
+            plot_kwargs,
             show_figs : list = ["input", "fn"],
             ax=None, 
             to_file : str =None, 
@@ -640,63 +637,55 @@ class FlatNormFixture(unittest.TestCase):
         do_return = kwargs.get('do_return', False)
 
         fig, axs, no_ax = get_fig_from_ax( 
-            ax, ndim=(len(all_plot_data), len(show_figs)), 
+            ax, ndim=(1, len(show_figs)), 
             **kwargs)
 
         # Iterate over each plotdata
-        for i,plot_kwargs in enumerate(all_plot_data):
-            if i == 0:
-                title_pfx = "original"
-            else:
-                title_pfx = "perturbed"
+        triangulated = plot_kwargs["triangulated"]
+        T1=plot_kwargs["T1"]
+        T2=plot_kwargs["T2"]
+        echain=plot_kwargs["echain"]
+        tchain=plot_kwargs["tchain"]
+        region=plot_kwargs["region"]
+        hd_geom = plot_kwargs["hd_geom"]
+        lambda_ = plot_kwargs["lambda_"]
+        epsilon = plot_kwargs["epsilon"]
+        fnorm = plot_kwargs["fnorm"]
+        hd = plot_kwargs["hd"]
+        w = plot_kwargs["w"]
+        
+        # Titles for the plot or plots
+        titles = {
+            'lambda': f"$\\lambda = {lambda_}$",
+            'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
+            'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
+            'fn': f"${FNN}={fnorm:0.3g}$",
+            'haus': f"${HAUS}={hd:0.3g}$"
+            }
 
-            triangulated = plot_kwargs["triangulated"]
-            T1=plot_kwargs["T1"]
-            T2=plot_kwargs["T2"]
-            echain=plot_kwargs["echain"]
-            tchain=plot_kwargs["tchain"]
-            region=plot_kwargs["region"]
-            hd_geom = plot_kwargs["hd_geom"]
-            lambda_ = plot_kwargs["lambda_"]
-            epsilon = plot_kwargs["epsilon"]
-            fnorm = plot_kwargs["fnorm"]
-            hd = plot_kwargs["hd"]
-            w = plot_kwargs["w"]
+        # ---- PLOT ----
+        for j,figure in enumerate(show_figs):
+            if figure == "input":
+                plot_triangulation(triangulated, T1, T2, axs[j], 
+                                show_triangulation=False, 
+                                region_bound=region, 
+                                legend=True, location=location)
+                title_keys = ['epsilon', 'ratio']
+            elif figure == "fn":
+                plot_norm(triangulated, echain, tchain, axs[j], 
+                        region_bound=region)
+                title_keys = ['lambda', 'fn']
+            elif figure == "haus":
+                plot_triangulation(triangulated, T1, T2, axs[j], 
+                                show_triangulation=False, 
+                                hd_geom = hd_geom,
+                                region_bound=region, 
+                                legend=True, location=location)
+                title_keys = ["haus"]
             
-            # Titles for the plot or plots
-            titles = {
-                'lambda': f"$\\lambda = {lambda_:0.4f}$",
-                'epsilon': f"$\\epsilon = {epsilon:0.4f}$",
-                'ratio': f"$|T|/\\epsilon = {w/epsilon :0.3g}$",
-                'fn': f"${FNN}={fnorm:0.3g}$",
-                'haus': f"${HAUS}={hd:0.3g}$"
-                }
-
-            # ---- PLOT ----
-            for j,figure in enumerate(show_figs):
-                if figure == "input":
-                    plot_triangulation(triangulated, T1, T2, axs[i,j], 
-                                    show_triangulation=False, 
-                                    region_bound=region, 
-                                    legend=True, location=location)
-                    title_keys = ['epsilon', 'ratio']
-                elif figure == "fn":
-                    plot_norm(triangulated, echain, tchain, axs[i,j], 
-                            region_bound=region)
-                    title_keys = ['lambda', 'fn']
-                elif figure == "haus":
-                    plot_triangulation(triangulated, T1, T2, axs[i,j], 
-                                    show_triangulation=False, 
-                                    hd_geom = hd_geom,
-                                    region_bound=region, 
-                                    legend=True, location=location)
-                    title_keys = ["haus"]
-                
-                # Title for the plot
-                title = ", ".join([titles[t_name] for t_name in title_keys])
-                if j==0:
-                    title = f"{title_pfx} : {title}"
-                axs[i,j].set_title(title, fontsize=fontsize)
+            # Title for the plot
+            title = ", ".join([titles[t_name] for t_name in title_keys])
+            axs[j].set_title(title, fontsize=fontsize)
             
             
         # get the super title

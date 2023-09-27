@@ -15,7 +15,7 @@ workpath = os.getcwd()
 libpath = workpath + "/libs/"
 sys.path.append(libpath)
 
-from pyFlatNormFixture import FlatNormFixture, close_fig, get_fig_from_ax
+from libs.pyFlatNormFixture import FlatNormFixture, close_fig, get_fig_from_ax
 
 
 area_name = {

@@ -16,11 +16,10 @@ import triangle as tr
 import matplotlib.pyplot as plt
 
 workpath = os.getcwd()
-libpath = workpath + "/libs/"
-sys.path.append(libpath)
 
-from pyDrawNetworklib import plot_demo_flatnorm
-from pyFlatNormlib import get_current, msfn, get_structure
+
+from libs.pyDrawNetworklib import plot_demo_flatnorm
+from libs.pyFlatNormlib import get_current, msfn, get_structure
 
 
 #%% Flat norm theory - Get the input geometry
@@ -38,7 +37,6 @@ xpts = np.linspace(mu1 - 10*sigma1, mu2 + 7*sigma2, 200)
 ypts = 1000*(stats.norm.pdf(xpts, mu1, sigma1)+stats.norm.pdf(xpts, mu2, sigma2))
 
 
-
 # Get input geometry
 vertices = [Point(x,y) for x,y in zip(xpts,ypts)]
 line = LineString(vertices)
@@ -50,7 +48,6 @@ all_lines = MultiLineString(geom)
 rect_env = list(all_lines.minimum_rotated_rectangle.buffer(1e-4).boundary.coords)
 extra_geom = [LineString((pt1,pt2)) for pt1,pt2 in zip(rect_env,rect_env[1:])]
 struct = get_structure(extra_geom + geom)
-
 
 # Triangulated structure
 tri_struct = tr.triangulate(struct,opts='ps')
@@ -68,10 +65,9 @@ tri_struct['edges'] = np.array(edges)
 # Input current
 T = get_current(tri_struct, geom)
 
-
 #%% Flatnorm computation
 lambda_ = 0.03
-x,s,norm,_,_ = msfn(tri_struct['vertices'], tri_struct['triangles'], 
+x,s,norm,_,_,_ = msfn(tri_struct['vertices'], tri_struct['triangles'], 
                 tri_struct['edges'], T, lambda_,k=1)
 
 
